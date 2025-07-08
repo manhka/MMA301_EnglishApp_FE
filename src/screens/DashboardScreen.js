@@ -1,80 +1,87 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
   StyleSheet,
-  Dimensions,
+  ActivityIndicator,
   Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import api from "../services/api";
 
 const { width } = Dimensions.get("window");
 
-// Mock data
-const skillsData = [
-  { id: 1, name: "Listening", icon: "🎧", color: "#10B981", progress: 70 },
-  { id: 2, name: "Reading", icon: "📖", color: "#3B82F6", progress: 60 },
-  { id: 3, name: "Speaking", icon: "🗣️", color: "#F59E0B", progress: 40 },
-  { id: 4, name: "Writing", icon: "✍️", color: "#8B5CF6", progress: 30 },
-  { id: 5, name: "Vocabulary", icon: "📝", color: "#EF4444", progress: 50 },
-];
-
-const recommendedLessons = [
-  {
-    id: 1,
-    title: "Skimming Techniques",
-    skill: "Reading",
-    duration: "15 min",
-    level: "Intermediate",
-  },
-  {
-    id: 2,
-    title: "Opinion Essays",
-    skill: "Writing",
-    duration: "20 min",
-    level: "Beginner",
-  },
-  {
-    id: 3,
-    title: "Note-taking Strategies",
-    skill: "Listening",
-    duration: "12 min",
-    level: "Advanced",
-  },
-];
-
-const history = [
-  {
-    id: 1,
-    title: "Present Perfect Practice",
-    skill: "Grammar",
-    date: "2 days ago",
-    score: 85,
-  },
-  {
-    id: 2,
-    title: "Speaking Part 1 Topics",
-    skill: "Speaking",
-    date: "1 day ago",
-    score: 78,
-  },
-];
-
-// Mock my learning data
-const userStats = {
-  totalLessons: 42,
-  avgScores: { listening: 6.5, reading: 6, speaking: 6, writing: 5.5 },
-  totalTime: "12h 30m",
-  weakSkills: ["Writing", "Speaking"],
-};
-
 export default function DashboardScreen({ navigation, route }) {
   const userName = route.params?.userName || "Student";
+  const [skills, setSkills] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState("recommendations");
   const [showDropdown, setShowDropdown] = useState(false);
   const [showLearning, setShowLearning] = useState(false);
+  const [userStats, setUserStats] = useState(null);
+
+  useEffect(() => {
+    const fetchProgress = async () => {
+      try {
+        const userId = await SecureStore.getItemAsync("userId");
+        const level =
+          (await SecureStore.getItemAsync("selectedLevel")) || "Beginner";
+
+        if (!userId) {
+          navigation.replace("Login");
+          return;
+        }
+
+        const res = await api.get(`/${userId}/${level}/progress`);
+        const { progress } = res.data;
+
+        const skillsFormatted = [
+          {
+            id: 1,
+            name: "Listening",
+            icon: "🎧",
+            color: "#10B981",
+            progress: progress.skills.listening || 0,
+          },
+          {
+            id: 2,
+            name: "Reading",
+            icon: "📖",
+            color: "#3B82F6",
+            progress: progress.skills.reading || 0,
+          },
+          {
+            id: 3,
+            name: "Speaking",
+            icon: "🗣️",
+            color: "#F59E0B",
+            progress: progress.skills.speaking || 0,
+          },
+          {
+            id: 4,
+            name: "Writing",
+            icon: "✍️",
+            color: "#8B5CF6",
+            progress: progress.skills.writing || 0,
+          },
+        ];
+
+        setSkills(skillsFormatted);
+        setLoading(false);
+      } catch (err) {
+        console.log("fetch progress error", err);
+        Alert.alert("Error", "Could not load progress");
+        setLoading(false);
+      }
+    };
+
+    fetchProgress();
+  }, []);
 
   const handleLogout = () => {
     Alert.alert("Confirm Logout", "Are you sure you want to logout?", [
@@ -84,6 +91,7 @@ export default function DashboardScreen({ navigation, route }) {
         style: "destructive",
         onPress: async () => {
           await SecureStore.deleteItemAsync("userToken");
+          await SecureStore.deleteItemAsync("userId");
           await SecureStore.deleteItemAsync("userName");
           navigation.replace("Login");
         },
@@ -95,7 +103,7 @@ export default function DashboardScreen({ navigation, route }) {
     <TouchableOpacity
       key={skill.id}
       style={[styles.skillCard, { borderColor: skill.color }]}
-      onPress={() => navigation.navigate("LessonList", { skill: skill.name })}
+      onPress={() => navigation.navigate("Lesson", { skill: skill.name })}
     >
       <Text style={styles.skillIcon}>{skill.icon}</Text>
       <Text style={styles.skillTitle}>{skill.name}</Text>
@@ -111,44 +119,92 @@ export default function DashboardScreen({ navigation, route }) {
     </TouchableOpacity>
   );
 
-  const renderRecommended = () =>
-    recommendedLessons.map((lesson) => (
-      <TouchableOpacity key={lesson.id} style={styles.lessonCard}>
-        <Text style={styles.lessonTitle}>{lesson.title}</Text>
-        <Text style={styles.lessonDetail}>
-          {lesson.skill} • {lesson.duration} • {lesson.level}
-        </Text>
-      </TouchableOpacity>
-    ));
+  const renderRecommended = () => (
+    <>
+      <Text style={styles.sectionTitle}>Recommended Lessons</Text>
+      {[
+        {
+          id: 1,
+          title: "Skimming Techniques",
+          skill: "Reading",
+          duration: "15 min",
+          level: "Intermediate",
+        },
+        {
+          id: 2,
+          title: "Opinion Essays",
+          skill: "Writing",
+          duration: "20 min",
+          level: "Beginner",
+        },
+      ].map((lesson) => (
+        <View key={lesson.id} style={styles.lessonCard}>
+          <Text style={styles.lessonTitle}>{lesson.title}</Text>
+          <Text style={styles.lessonDetail}>
+            {lesson.skill} • {lesson.duration} • {lesson.level}
+          </Text>
+        </View>
+      ))}
+    </>
+  );
 
-  const renderHistory = () =>
-    history.map((item) => (
-      <View key={item.id} style={styles.historyCard}>
-        <Text style={styles.historyTitle}>{item.title}</Text>
-        <Text style={styles.historyDetail}>
-          {item.skill} • {item.date}
-        </Text>
-        <Text style={styles.historyScore}>Score: {item.score}%</Text>
+  const renderHistory = () => (
+    <>
+      <Text style={styles.sectionTitle}>Recent History</Text>
+      {[
+        {
+          id: 1,
+          title: "Reading Practice",
+          skill: "Reading",
+          date: "Yesterday",
+          score: 80,
+        },
+        {
+          id: 2,
+          title: "Speaking Task 1",
+          skill: "Speaking",
+          date: "2 days ago",
+          score: 75,
+        },
+      ].map((h) => (
+        <View key={h.id} style={styles.lessonCard}>
+          <Text style={styles.lessonTitle}>{h.title}</Text>
+          <Text style={styles.lessonDetail}>
+            {h.skill} • {h.date} • Score {h.score}%
+          </Text>
+        </View>
+      ))}
+    </>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#059669" />
       </View>
-    ));
+    );
+  }
 
   return (
-    <>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       <ScrollView style={styles.container}>
         {/* Header */}
-        <View style={styles.headerContainer}>
+        <View style={styles.header}>
           <TouchableOpacity
             style={styles.profileContainer}
             onPress={() => setShowDropdown(!showDropdown)}
           >
             <View style={styles.avatar}>
-              <Text style={styles.avatarIcon}>👤</Text>
+              <Text style={{ color: "#fff" }}>👤</Text>
             </View>
-            <Text style={styles.profileName}>{userName}</Text>
+            <Text style={styles.userName}>{userName}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Dropdown menu */}
+        {/* Dropdown */}
         {showDropdown && (
           <View style={styles.dropdownMenu}>
             <TouchableOpacity
@@ -158,23 +214,21 @@ export default function DashboardScreen({ navigation, route }) {
                 setShowLearning(true);
               }}
             >
-              <Text style={styles.dropdownIcon}>📊</Text>
-              <Text style={styles.dropdownText}>My Learning</Text>
+              <Text>📊 My Learning</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.dropdownItem}
               onPress={handleLogout}
             >
-              <Text style={styles.dropdownIcon}>🔓</Text>
-              <Text style={styles.dropdownText}>Logout</Text>
+              <Text>🚪 Logout</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Skills */}
+        {/* Skills Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Access</Text>
-          <View style={styles.skillsGrid}>{skillsData.map(renderSkill)}</View>
+          <Text style={styles.sectionTitle}>Your Skills</Text>
+          <View style={styles.skillsGrid}>{skills.map(renderSkill)}</View>
         </View>
 
         {/* Tabs */}
@@ -210,137 +264,88 @@ export default function DashboardScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
 
-        {/* Dynamic section */}
+        {/* Dynamic content */}
         <View style={styles.contentSection}>
           {selectedTab === "recommendations"
             ? renderRecommended()
             : renderHistory()}
         </View>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
-
-      {/* MyLearning popup */}
-      {showLearning && (
-        <View style={styles.learningOverlay}>
-          <View style={styles.learningBox}>
-            <Text style={styles.learningTitle}>📊 My Learning</Text>
-            <Text style={styles.learningItem}>
-              Total lessons: {userStats.totalLessons}
-            </Text>
-            <Text style={styles.learningItem}>
-              Listening: {userStats.avgScores.listening}
-            </Text>
-            <Text style={styles.learningItem}>
-              Reading: {userStats.avgScores.reading}
-            </Text>
-            <Text style={styles.learningItem}>
-              Speaking: {userStats.avgScores.speaking}
-            </Text>
-            <Text style={styles.learningItem}>
-              Writing: {userStats.avgScores.writing}
-            </Text>
-            <Text style={styles.learningItem}>
-              Total time: {userStats.totalTime}
-            </Text>
-            <Text style={styles.learningItem}>
-              Weak skills: {userStats.weakSkills.join(", ")}
-            </Text>
-            <TouchableOpacity
-              style={styles.learningClose}
-              onPress={() => setShowLearning(false)}
-            >
-              <Text style={styles.learningCloseText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F0FDF4" },
-  headerContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
+  loading: { flex: 1, justifyContent: "center", alignItems: "center" },
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    position: "relative",
-    zIndex: 99,
+    paddingTop: Platform.OS === "ios" ? 80 : 60,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
   },
   profileContainer: { flexDirection: "row", alignItems: "center" },
   avatar: {
+    backgroundColor: "#059669",
     width: 40,
     height: 40,
-    backgroundColor: "#059669",
     borderRadius: 20,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
     marginRight: 8,
   },
-  avatarIcon: { fontSize: 20, color: "#fff" },
-  profileName: { fontSize: 18, fontWeight: "bold", color: "#111827" },
+  userName: { fontSize: 18, fontWeight: "bold", color: "#111827" },
   dropdownMenu: {
     position: "absolute",
-    top: 100,
+    top: 120,
     left: 20,
-    backgroundColor: "#FFF",
+    backgroundColor: "#fff",
     borderRadius: 8,
     shadowColor: "#000",
     shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowRadius: 4,
     elevation: 6,
     width: 160,
     zIndex: 999,
   },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderBottomColor: "#F3F4F6",
-    borderBottomWidth: 1,
-  },
-  dropdownIcon: { fontSize: 18, marginRight: 8 },
-  dropdownText: { fontSize: 14, fontWeight: "500", color: "#111827" },
-  section: { paddingHorizontal: 20, marginBottom: 20 },
-  sectionTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 12 },
+
+  dropdownItem: { padding: 12 },
+  section: { paddingHorizontal: 20, marginBottom: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 12 },
   skillsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 12,
   },
   skillCard: {
     width: (width - 64) / 2,
     backgroundColor: "#FFF",
+    borderWidth: 2,
     borderRadius: 16,
     padding: 16,
-    borderWidth: 2,
     marginBottom: 12,
   },
   skillIcon: { fontSize: 28, marginBottom: 8 },
-  skillTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 8 },
+  skillTitle: { fontSize: 16, fontWeight: "bold" },
   progressBar: {
     height: 6,
     backgroundColor: "#E5E7EB",
     borderRadius: 3,
-    marginBottom: 6,
+    marginVertical: 4,
   },
   progressFill: { height: "100%", borderRadius: 3 },
-  progressText: { fontSize: 12, color: "#6B7280", fontWeight: "600" },
+  progressText: { fontSize: 12, color: "#6B7280" },
   tabContainer: {
     flexDirection: "row",
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginBottom: 12,
+    backgroundColor: "#fff",
+    margin: 20,
+    borderRadius: 8,
   },
-  tab: { flex: 1, alignItems: "center", paddingVertical: 12 },
+  tab: { flex: 1, padding: 12, alignItems: "center" },
   activeTab: { backgroundColor: "#059669" },
-  tabText: { fontSize: 16, fontWeight: "600", color: "#6B7280" },
-  activeTabText: { color: "#FFF" },
+  tabText: { color: "#6B7280", fontWeight: "600" },
+  activeTabText: { color: "#fff" },
   contentSection: { paddingHorizontal: 20 },
   lessonCard: {
     backgroundColor: "#FFF",
@@ -349,44 +354,5 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   lessonTitle: { fontSize: 16, fontWeight: "bold", color: "#111827" },
-  lessonDetail: { fontSize: 14, color: "#6B7280", marginTop: 4 },
-  historyCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  historyTitle: { fontSize: 16, fontWeight: "bold", color: "#111827" },
-  historyDetail: { fontSize: 14, color: "#6B7280", marginTop: 4 },
-  historyScore: {
-    fontSize: 14,
-    color: "#059669",
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  learningOverlay: {
-    position: "absolute",
-    top: 100,
-    left: 20,
-    right: 20,
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    padding: 20,
-    zIndex: 999,
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-  },
-  learningBox: {},
-  learningTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 12 },
-  learningItem: { fontSize: 14, marginVertical: 4 },
-  learningClose: {
-    marginTop: 12,
-    backgroundColor: "#059669",
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  learningCloseText: { color: "#fff", fontWeight: "600" },
+  lessonDetail: { fontSize: 12, color: "#6B7280", marginTop: 4 },
 });

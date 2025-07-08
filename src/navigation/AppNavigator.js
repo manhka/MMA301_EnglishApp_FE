@@ -5,6 +5,8 @@ import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import HomeScreen from "../screens/HomeScreen";
 import DashboardScreen from "../screens/DashboardScreen";
+import LessonScreen from "../screens/LessonScreen";
+import LessonDetailsScreen from "../screens/LessonDetailtsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -39,6 +41,22 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Dashboard"
           component={DashboardScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+          }}
+        />
+        <Stack.Screen
+          name="Lesson"
+          component={LessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+          }}
+        />
+        <Stack.Screen
+          name="LessonDetails"
+          component={LessonDetailsScreen}
           options={{
             headerShown: false,
             headerLeft: () => null,
