@@ -11,13 +11,13 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import { useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import api from "../services/api";
 
 export default function LessonDetailScreen() {
   const route = useRoute();
   const { lessonId } = route.params;
-
+  const navigation = useNavigation();
   const [lesson, setLesson] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -37,39 +37,10 @@ export default function LessonDetailScreen() {
     fetchLesson();
   }, [lessonId]);
 
-  // Hàm xử lý khi nhấn nút
-  const handleLessonAction = () => {
-    if (!lesson) return;
-
-    // Dựa vào trạng thái của bài học
-    switch (lesson.status) {
-      case "not_started":
-        Alert.alert(
-          "Starting Lesson!",
-          `You are now beginning "${lesson.title}"`
-        );
-        // Logic để bắt đầu bài học (ví dụ: điều hướng đến màn hình bài tập)
-        // navigation.navigate("LessonInteractiveScreen", { lessonId: lesson._id });
-        break;
-      case "in_progress":
-        Alert.alert(
-          "Resuming Lesson!",
-          `Continuing "${lesson.title}" from where you left off.`
-        );
-        // Logic để tiếp tục bài học
-        // navigation.navigate("LessonInteractiveScreen", { lessonId: lesson._id, resume: true });
-        break;
-      case "completed":
-        Alert.alert(
-          "Reviewing Lesson!",
-          `You have completed "${lesson.title}". Reviewing now.`
-        );
-        // Logic để xem lại bài học (ví dụ: điều hướng đến màn hình tóm tắt hoặc bài tập đã làm)
-        // navigation.navigate("LessonReviewScreen", { lessonId: lesson._id });
-        break;
-      default:
-        Alert.alert("Action", `Performing action for "${lesson.title}"`);
-        break;
+  const handleStartLesson = () => {
+    if (lesson) {
+      Alert.alert("🚀 Start Lesson", `Starting "${lesson.title}" now...`);
+      navigation.navigate("Speaking", { lessonId: lesson._id });
     }
   };
 
@@ -91,55 +62,9 @@ export default function LessonDetailScreen() {
     );
   }
 
-  const {
-    title,
-    level,
-    skill,
-    topicId,
-    content,
-    media,
-    questions,
-    duration,
-    status,
-  } = lesson; // Đảm bảo lấy trường status từ lesson
+  const { title, level, skill, topicId, content, media, questions, duration } =
+    lesson;
 
-  // Hàm xác định style và text cho nút dựa trên trạng thái
-  const getButtonProps = () => {
-    switch (status) {
-      case "not_started":
-        return {
-          text: "🚀 Start Lesson",
-          style: styles.startButtonDefault,
-          textStyle: styles.startButtonTextDefault,
-        };
-      case "in_progress":
-        return {
-          text: "➡️ Continue Lesson",
-          style: styles.startButtonInProgress,
-          textStyle: styles.startButtonTextInProgress,
-        };
-      case "completed":
-        return {
-          text: "✅ Review Lesson",
-          style: styles.startButtonCompleted,
-          textStyle: styles.startButtonTextCompleted,
-        };
-      default:
-        return {
-          text: "Start Lesson",
-          style: styles.startButtonDefault,
-          textStyle: styles.startButtonTextDefault,
-        };
-    }
-  };
-
-  const {
-    text: buttonText,
-    style: buttonStyle,
-    textStyle: buttonTextStyle,
-  } = getButtonProps();
-
-  // Function to determine difficulty badge style (kept for completeness)
   const getDifficultyStyle = (difficulty) => {
     switch (difficulty) {
       case "Beginner":
@@ -232,13 +157,11 @@ export default function LessonDetailScreen() {
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={[styles.startButtonBase, buttonStyle]} // Áp dụng style cơ bản và style trạng thái
-          onPress={handleLessonAction}
-          activeOpacity={0.8}
+          style={styles.startButton}
+          onPress={handleStartLesson}
+          activeOpacity={0.85}
         >
-          <Text style={[styles.startButtonTextBase, buttonTextStyle]}>
-            {buttonText}
-          </Text>
+          <Text style={styles.startButtonText}>🚀 Start Lesson</Text>
         </TouchableOpacity>
       </View>
 
@@ -256,7 +179,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
   },
   loadingText: {
     marginTop: 10,
@@ -362,46 +284,23 @@ const styles = StyleSheet.create({
   buttonContainer: {
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: "#f8fafc",
   },
-  // Base styles for the button (common properties)
-  startButtonBase: {
+  startButton: {
+    backgroundColor: "#10b981",
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#10b981",
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 8,
   },
-  // Styles for different states
-  startButtonDefault: {
-    backgroundColor: "#10b981", // Start Lesson
-    shadowColor: "#10b981",
-  },
-  startButtonInProgress: {
-    backgroundColor: "#f97316", // Continue Lesson (orange)
-    shadowColor: "#f97316",
-  },
-  startButtonCompleted: {
-    backgroundColor: "#2563eb", // Review Lesson (blue)
-    shadowColor: "#2563eb",
-  },
-  // Base text styles for the button
-  startButtonTextBase: {
+  startButtonText: {
     fontSize: 18,
     fontWeight: "700",
+    color: "#fff",
     letterSpacing: 0.5,
-  },
-  // Text styles for different states
-  startButtonTextDefault: {
-    color: "#fff",
-  },
-  startButtonTextInProgress: {
-    color: "#fff",
-  },
-  startButtonTextCompleted: {
-    color: "#fff",
   },
 });

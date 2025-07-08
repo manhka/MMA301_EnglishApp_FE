@@ -7,6 +7,10 @@ import HomeScreen from "../screens/HomeScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import LessonScreen from "../screens/LessonScreen";
 import LessonDetailsScreen from "../screens/LessonDetailtsScreen";
+import ReadingScreen from "../screens/ReadingScreen";
+import ListeningScreen from "../screens/ListeningScreen";
+import WritingScreen from "../screens/WritingScreen";
+import SpeakingScreen from "../screens/SpeakingScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -57,6 +61,38 @@ export default function AppNavigator() {
         <Stack.Screen
           name="LessonDetails"
           component={LessonDetailsScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+          }}
+        />
+        <Stack.Screen
+          name="Reading"
+          component={ReadingScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+          }}
+        />
+        <Stack.Screen
+          name="Listening"
+          component={ListeningScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+          }}
+        />
+        <Stack.Screen
+          name="Writing"
+          component={WritingScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+          }}
+        />
+        <Stack.Screen
+          name="Speaking"
+          component={SpeakingScreen}
           options={{
             headerShown: false,
             headerLeft: () => null,
