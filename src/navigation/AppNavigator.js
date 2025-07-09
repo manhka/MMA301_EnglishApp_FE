@@ -11,6 +11,7 @@ import ReadingScreen from "../screens/ReadingScreen";
 import ListeningScreen from "../screens/ListeningScreen";
 import WritingScreen from "../screens/WritingScreen";
 import SpeakingScreen from "../screens/SpeakingScreen";
+import ResultScreen from "../screens/ResultScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -93,6 +94,14 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Speaking"
           component={SpeakingScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+          }}
+        />
+        <Stack.Screen
+          name="Result"
+          component={ResultScreen}
           options={{
             headerShown: false,
             headerLeft: () => null,

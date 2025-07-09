@@ -39,8 +39,7 @@ export default function LessonDetailScreen() {
 
   const handleStartLesson = () => {
     if (lesson) {
-      Alert.alert("🚀 Start Lesson", `Starting "${lesson.title}" now...`);
-      navigation.navigate("Speaking", { lessonId: lesson._id });
+      navigation.navigate("Reading", { lessonId: lesson._id });
     }
   };
 

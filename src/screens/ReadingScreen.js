@@ -1,243 +1,295 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  StatusBar, // Import StatusBar
-  Platform, // Import Platform for platform-specific styles
+  StatusBar,
+  Alert,
+  ScrollView,
+  Platform,
+  Dimensions,
 } from "react-native";
-
-const mockReadingData = {
-  passage:
-    "Environmental pollution has become one of the biggest problems in many countries. It affects the air we breathe, the water we drink, and the food we eat. Addressing this complex issue requires a multi-faceted approach involving government policies, industrial innovations, and individual actions. Sustainable practices and a global commitment are crucial for safeguarding our planet for future generations.",
-  questions: [
-    {
-      id: 1,
-      question:
-        "What essential elements are affected by environmental pollution?",
-      options: [
-        "Only the air we breathe",
-        "Just water and the food we consume",
-        "The air we breathe, the water we drink, and the food we eat",
-        "None of the listed elements",
-      ],
-    },
-    {
-      id: 2,
-      question: "Why has pollution become a major global concern?",
-      options: [
-        "It is often overlooked by authorities",
-        "It significantly impacts critical natural resources",
-        "It paradoxically stimulates economic growth",
-        "It enhances the flavor profile of various foods",
-      ],
-    },
-    {
-      id: 3,
-      question: "What is crucial for safeguarding our planet?",
-      options: [
-        "Ignoring the problem",
-        "Individual actions only",
-        "Sustainable practices and a global commitment",
-        "Industrial innovations exclusively",
-      ],
-    },
-  ],
-};
-
+import api from "../services/api";
+import { useNavigation, useRoute } from "@react-navigation/native";
 export default function ReadingScreen() {
+  const route = useRoute();
+  const { lessonId } = route.params;
+  const navigation = useNavigation();
+  const [lesson, setLesson] = useState(null);
   const [answers, setAnswers] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [timeLeft, setTimeLeft] = useState(0);
 
-  const handleSelect = (qId, option) => {
-    setAnswers((prev) => ({ ...prev, [qId]: option }));
+  useEffect(() => {
+    const fetchLesson = async () => {
+      try {
+        const res = await api.get(`/lesson/${lessonId}/details`);
+        setLesson(res.data.lesson);
+        setTimeLeft(res.data.lesson.duration * 60);
+      } catch (err) {
+        console.error("Failed to load lesson", err);
+        Alert.alert("Error", "Unable to load lesson.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLesson();
+  }, [lessonId]);
+
+  useEffect(() => {
+    if (!timeLeft) return;
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  const handleSelect = (qId, index, type) => {
+    const key = String(qId);
+    setAnswers((prev) => {
+      if (type === "multiple-choice") {
+        const current = prev[key] || [];
+        const updated = current.includes(index)
+          ? current.filter((i) => i !== index)
+          : [...current, index];
+        return { ...prev, [key]: updated };
+      } else {
+        return { ...prev, [key]: index };
+      }
+    });
+  };
+
+  const formatTime = (seconds) => {
+    const min = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+    return `${min}:${sec < 10 ? "0" : ""}${sec}`;
   };
 
   const handleSubmit = () => {
-    console.log("User answers:", answers);
-    // You could add navigation or evaluation logic here
-    alert("Quiz Submitted! Check console for answers."); // Simple alert for demonstration
+    navigation.navigate("Result");
   };
+
+  if (loading || !lesson) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <Text style={styles.loadingText}>Loading...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header for the reading section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Reading Passage</Text>
+      <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
+
+      {/* Header cố định */}
+      <View style={styles.fixedHeader}>
+        <View style={styles.timerBox}>
+          <Text style={styles.timerText}>⏳ {formatTime(timeLeft)}</Text>
         </View>
         <View style={styles.passageContainer}>
-          <Text style={styles.passage}>{mockReadingData.passage}</Text>
+          <ScrollView style={styles.passageScroll} nestedScrollEnabled>
+            <Text style={styles.passage}>{lesson.content}</Text>
+          </ScrollView>
         </View>
+      </View>
 
-        {/* Header for the questions section */}
-        <View style={[styles.sectionHeader, styles.questionHeader]}>
-          <Text style={styles.sectionTitle}>Questions</Text>
-        </View>
+      {/* Nội dung cuộn */}
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {lesson.questions.map((item, index) => {
+          const qId = String(item._id);
+          const isMultiple = item.type === "multiple-choice";
 
-        {mockReadingData.questions.map((q) => (
-          <View key={q.id} style={styles.questionBlock}>
-            <Text style={styles.questionNumber}>Question {q.id}.</Text>
-            <Text style={styles.question}>{q.question}</Text>
-            <View style={styles.optionsContainer}>
-              {q.options.map((opt, idx) => {
-                const isSelected = answers[q.id] === opt;
+          const userAnswer = Object.prototype.hasOwnProperty.call(answers, qId)
+            ? answers[qId]
+            : isMultiple
+            ? []
+            : null;
+
+          return (
+            <View key={qId} style={styles.questionBlock}>
+              {/* Tiêu đề câu hỏi + loại */}
+              <View style={styles.questionHeader}>
+                <Text style={styles.questionNumber}>Question {index + 1}</Text>
+                <Text style={styles.questionType}>
+                  [{isMultiple ? "Multiple Choice" : "Single Choice"}]
+                </Text>
+              </View>
+
+              {/* Nội dung câu hỏi */}
+              <Text style={styles.questionText}>{item.questionText}</Text>
+
+              {/* Danh sách đáp án */}
+              {item.choices.map((choice, i) => {
+                const selected = isMultiple
+                  ? userAnswer.includes(i)
+                  : userAnswer === i;
+
                 return (
                   <TouchableOpacity
-                    key={idx}
-                    style={[styles.option, isSelected && styles.optionSelected]}
-                    onPress={() => handleSelect(q.id, opt)}
-                    activeOpacity={0.7} // Adds a subtle press effect
+                    key={i}
+                    style={[styles.option, selected && styles.optionSelected]}
+                    onPress={() => handleSelect(qId, i, item.type)}
+                    activeOpacity={0.7}
                   >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        isSelected && styles.optionTextSelected,
-                      ]}
-                    >
-                      {opt}
-                    </Text>
+                    <View style={styles.optionRow}>
+                      <Text
+                        style={[
+                          styles.optionText,
+                          selected && styles.optionTextSelected,
+                        ]}
+                      >
+                        {choice}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
             </View>
-          </View>
-        ))}
+          );
+        })}
 
         <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
           <Text style={styles.submitText}>Submit Answers</Text>
         </TouchableOpacity>
-        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+// Lấy chiều cao màn hình để xác định chiều cao còn lại
+const SCREEN_HEIGHT = Dimensions.get("window").height;
+const FIXED_HEADER_HEIGHT = 220;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f8fafc", // A very light, almost white background
+  container: { flex: 1, backgroundColor: "#F0FDF4" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { fontSize: 16, color: "#6b7280" },
+
+  fixedHeader: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "android" ? 30 : 10,
+    backgroundColor: "#F0FDF4",
   },
-  scrollContent: {
-    padding: 20,
-    paddingTop: Platform.OS === "android" ? 20 : 0, // Adjust for Android StatusBar
-  },
-  sectionHeader: {
-    marginBottom: 15,
-    borderBottomWidth: 2,
-    borderBottomColor: "#e2e8f0", // Light gray line
-    paddingBottom: 10,
-  },
-  questionHeader: {
-    marginTop: 20,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1e293b", // Darker text for titles
+  timerBox: { alignItems: "flex-end", marginBottom: 8 },
+  timerText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#dc2626",
+    marginTop: 5,
   },
   passageContainer: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
-    padding: 20,
-    marginBottom: 25,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    padding: 16,
+    maxHeight: 160,
+    marginBottom: 10,
   },
+  passageScroll: { maxHeight: 130 },
   passage: {
-    fontSize: 16,
-    lineHeight: 25,
-    color: "#334155", // Slightly softer black
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#334155",
     textAlign: "justify",
+  },
+
+  scrollArea: {
+    height: SCREEN_HEIGHT - FIXED_HEADER_HEIGHT,
+    paddingHorizontal: 20,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+    paddingTop: 10,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1e293b",
+    marginBottom: 10,
   },
   questionBlock: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
-    padding: 20,
+    padding: 16,
     marginBottom: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  questionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5,
   },
   questionNumber: {
     fontSize: 14,
-    fontWeight: "bold",
-    color: "#64748b", // Muted gray
-    marginBottom: 5,
-  },
-  question: {
-    fontSize: 17,
+    color: "#6b7280",
     fontWeight: "600",
-    marginBottom: 15,
-    color: "#1e293b",
-    lineHeight: 24,
   },
-  optionsContainer: {
-    // No specific styles needed here, options handle their own spacing
+  questionType: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#6b7280",
+    backgroundColor: "#e5e7eb",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  questionText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1e293b",
+    marginBottom: 12,
   },
   option: {
-    paddingVertical: 14,
-    paddingHorizontal: 15,
-    backgroundColor: "#f0fdf4", // Very light green for unselected options
+    padding: 12,
     borderRadius: 10,
+    backgroundColor: "#ffffff",
     borderWidth: 1.5,
-    borderColor: "#d1fae5", // Lighter green border
+    borderColor: "#000000",
     marginBottom: 10,
-    flexDirection: "row", // To align text properly
-    alignItems: "center",
-    // Adding subtle shadow for a lifted effect
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
   },
   optionSelected: {
-    backgroundColor: "#dcfce7", // A bit darker green for selected
-    borderColor: "#059669", // Darker green border
-    // Adding a more prominent shadow for selected state
-    shadowColor: "#059669",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 6,
+    backgroundColor: "#d1d5db",
+    borderColor: "#000000",
   },
   optionText: {
     fontSize: 15,
-    color: "#374151", // Standard text color
-    flexShrink: 1, // Allows text to wrap
+    color: "#111827",
   },
   optionTextSelected: {
-    color: "#047857", // Dark green for selected text
-    fontWeight: "600",
+    fontWeight: "700",
+    color: "#111827",
+  },
+  optionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   submitBtn: {
-    marginTop: 30,
-    backgroundColor: "#10b981", // Primary green
-    paddingVertical: 18,
+    backgroundColor: "#2563eb",
+    paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
-    justifyContent: "center",
-    // Stronger shadow for the main action button
-    shadowColor: "#10b981",
+    marginTop: 20,
+    marginBottom: 50,
+    elevation: 8,
+    shadowColor: "#2563eb",
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    elevation: 10,
-    marginBottom: 20,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
   },
   submitText: {
     color: "#fff",
     fontSize: 18,
     fontWeight: "700",
-    letterSpacing: 0.5, // A little spacing for style
   },
 });

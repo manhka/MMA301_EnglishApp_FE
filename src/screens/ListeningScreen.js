@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,14 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import { Audio } from "expo-av"; // Chỉ hoạt động nếu dùng Expo
+import { Audio, Sound } from "expo-audio";
 
 export default function ListeningScreen({ route }) {
   const { lessonId } = route.params;
 
-  // Mock data
   const audioUrl =
     "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+
   const questions = [
     {
       id: "q1",
@@ -40,18 +40,27 @@ export default function ListeningScreen({ route }) {
 
   const playAudio = async () => {
     try {
-      const { sound } = await Audio.Sound.createAsync({ uri: audioUrl });
-      setSound(sound);
-      await sound.playAsync();
+      const newSound = new Sound();
+      await newSound.loadAsync({ uri: audioUrl });
+      await newSound.playAsync();
+      setSound(newSound);
     } catch (err) {
-      console.error("Error playing audio", err);
-      Alert.alert("Error", "Cannot play audio.");
+      console.error("Audio play error:", err);
+      Alert.alert("Error", "Could not play audio.");
     }
   };
 
   const selectAnswer = (questionId, index) => {
     setSelectedAnswers((prev) => ({ ...prev, [questionId]: index }));
   };
+
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, [sound]);
 
   return (
     <ScrollView style={styles.container}>
@@ -147,6 +156,8 @@ const styles = StyleSheet.create({
   },
   optionSelected: {
     backgroundColor: "#dbeafe",
+    borderColor: "#3b82f6",
+    borderWidth: 1,
   },
   optionText: {
     fontSize: 14,
