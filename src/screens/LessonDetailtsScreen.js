@@ -39,7 +39,7 @@ export default function LessonDetailScreen() {
 
   const handleStartLesson = () => {
     if (lesson) {
-      navigation.navigate("Reading", { lessonId: lesson._id });
+      navigation.navigate("Listening", { lessonId: lesson._id });
     }
   };
 
@@ -61,8 +61,7 @@ export default function LessonDetailScreen() {
     );
   }
 
-  const { title, level, skill, topicId, content, media, questions, duration } =
-    lesson;
+  const { title, level, skill, topicId, media, questions, duration } = lesson;
 
   const getDifficultyStyle = (difficulty) => {
     switch (difficulty) {
@@ -126,11 +125,6 @@ export default function LessonDetailScreen() {
         <Text style={styles.duration}>
           ⏰ Estimated time: {duration || "N/A"} minutes
         </Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>📄 Content</Text>
-        <Text style={styles.content}>{content || "No content available."}</Text>
       </View>
 
       {media && media.length > 0 && (

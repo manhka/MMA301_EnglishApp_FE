@@ -1,89 +1,81 @@
-import React from "react";
-import { View, Text, ScrollView, StyleSheet, SafeAreaView } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  SafeAreaView,
+  ActivityIndicator,
+} from "react-native";
+import api from "../services/api";
+import { useRoute } from "@react-navigation/native";
 
 export default function ResultScreen() {
-  // DỮ LIỆU MẪU
-  const result = {
-    score: 80,
-    totalQuestions: 5,
-    correctAnswers: 4,
-    details: [
-      { questionId: "q1", selected: 1, correct: true },
-      { questionId: "q2", selected: [0, 3], correct: false },
-      { questionId: "q3", selected: 1, correct: true },
-      { questionId: "q4", selected: 2, correct: true },
-      { questionId: "q5", selected: 0, correct: false },
-    ],
-  };
+  const route = useRoute();
+  const { resultId } = route.params;
 
-  const lesson = {
-    questions: [
-      {
-        _id: "q1",
-        questionText: "What gas do trees make for us to breathe?",
-        choices: ["Nitrogen", "Oxygen", "Carbon dioxide", "Methane"],
-        correctAnswers: 1,
-        type: "true-false",
-      },
-      {
-        _id: "q2",
-        questionText: "How do trees help the air?",
-        choices: [
-          "Make it dirty",
-          "Make it clean",
-          "Do nothing",
-          "Make it hot",
-        ],
-        correctAnswers: [1, 3],
-        type: "multiple-choice",
-      },
-      {
-        _id: "q3",
-        questionText: "Is oxygen important to humans?",
-        choices: ["False", "True"],
-        correctAnswers: 1,
-        type: "true-false",
-      },
-      {
-        _id: "q4",
-        questionText: "What should we do to protect the environment?",
-        choices: ["Cut trees", "Burn trees", "Plant more trees", "Do nothing"],
-        correctAnswers: 2,
-        type: "multiple-choice",
-      },
-      {
-        _id: "q5",
-        questionText: "Trees need money and gold to grow. (T/F)",
-        choices: ["True", "False"],
-        correctAnswers: 1,
-        type: "true-false",
-      },
-    ],
-  };
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchResult = async () => {
+      try {
+        const res = await api.get(`/result/${resultId}`);
+        setResult(res.data);
+      } catch (err) {
+        console.error("Failed to fetch result:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchResult();
+  }, [resultId]);
+
+  if (loading || !result) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={{ marginTop: 10 }}>Loading result...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.summaryBox}>
-          <Text style={styles.scoreText}>🎯 Score: {result.score}%</Text>
-          <Text style={styles.summaryText}>
-            ✅ Correct: {result.correctAnswers} / {result.totalQuestions}
+        <View style={styles.headerBox}>
+          <Text style={styles.lessonTitle}>{result.lessonId.title}</Text>
+          <Text style={styles.metaText}>
+            🕒 Duration: {result.lessonId.duration} mins
+          </Text>
+          <Text style={styles.metaText}>
+            📅 Submitted At: {new Date(result.submittedAt).toLocaleString()}
           </Text>
         </View>
 
-        {lesson.questions.map((q, index) => {
-          const r = result.details.find((d) => d.questionId === q._id);
+        <View style={styles.summaryBox}>
+          <Text style={styles.scoreText}>🎯 Score: {result.score}%</Text>
+          <Text style={styles.summaryText}>
+            ✅ Correct: {result.details.filter((d) => d.correct).length} /{" "}
+            {result.details.length}
+          </Text>
+        </View>
+
+        {result.details.map((r, index) => {
+          const q = r.questionId;
           const isMultiple = q.type === "multiple-choice";
 
-          // Bảo vệ kiểu dữ liệu
           const userSelected = isMultiple
-            ? Array.isArray(r?.selected)
+            ? Array.isArray(r.selected)
               ? r.selected
               : []
-            : r?.selected ?? null;
+            : typeof r.selected === "number"
+            ? r.selected
+            : null;
 
           const correctAnswers = q.correctAnswers;
-          const isCorrect = r?.correct;
+          const isCorrect = r.correct;
 
           return (
             <View key={q._id} style={styles.questionBox}>
@@ -97,7 +89,7 @@ export default function ResultScreen() {
                   : correctAnswers === i;
 
                 const isSelected = isMultiple
-                  ? userSelected.includes(i)
+                  ? Array.isArray(userSelected) && userSelected.includes(i)
                   : userSelected === i;
 
                 return (
@@ -131,6 +123,10 @@ export default function ResultScreen() {
               >
                 {isCorrect ? "✔️ Correct" : "✖️ Incorrect"}
               </Text>
+
+              {q.explanation && (
+                <Text style={styles.explanation}>💡 {q.explanation}</Text>
+              )}
             </View>
           );
         })}
@@ -139,12 +135,28 @@ export default function ResultScreen() {
   );
 }
 
-// STYLES
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F0FDF4" },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: {
     padding: 20,
     paddingBottom: 80,
+  },
+  headerBox: {
+    backgroundColor: "#e0f2fe",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  lessonTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1e3a8a",
+    marginBottom: 4,
+  },
+  metaText: {
+    fontSize: 14,
+    color: "#475569",
   },
   summaryBox: {
     backgroundColor: "#ffffff",
@@ -198,5 +210,13 @@ const styles = StyleSheet.create({
   },
   selectedAnswer: {
     borderWidth: 2,
+  },
+  explanation: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#0f172a",
+    backgroundColor: "#fef3c7",
+    padding: 10,
+    borderRadius: 8,
   },
 });

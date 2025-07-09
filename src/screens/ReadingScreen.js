@@ -10,17 +10,24 @@ import {
   ScrollView,
   Platform,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import api from "../services/api";
 import { useNavigation, useRoute } from "@react-navigation/native";
+
 export default function ReadingScreen() {
   const route = useRoute();
   const { lessonId } = route.params;
+
   const navigation = useNavigation();
+
   const [lesson, setLesson] = useState(null);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+
+  const userId = "664abc1234567890abcdef01"; // TODO: replace with actual user ID
 
   useEffect(() => {
     const fetchLesson = async () => {
@@ -69,13 +76,44 @@ export default function ReadingScreen() {
   };
 
   const handleSubmit = () => {
-    navigation.navigate("Result");
+    Alert.alert("Submit Answers", "Are you sure you want to submit?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "OK",
+        onPress: async () => {
+          setSubmitting(true);
+          try {
+            const res = await api.post("/result/submit", {
+              userId,
+              lessonId,
+              skill: "reading",
+              answers,
+            });
+
+            setTimeout(() => {
+              setSubmitting(false);
+              navigation.navigate("Result", { resultId: res.data.resultId });
+            }, 1500);
+          } catch (err) {
+            setSubmitting(false);
+            console.error("Submit failed", err);
+            Alert.alert("Error", "Could not submit your answers.");
+          }
+        },
+      },
+    ]);
   };
 
-  if (loading || !lesson) {
+  if (loading || submitting) {
     return (
       <SafeAreaView style={styles.center}>
-        <Text style={styles.loadingText}>Loading...</Text>
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={styles.loadingText}>
+          {loading ? "Loading..." : "Submitting your answers..."}
+        </Text>
       </SafeAreaView>
     );
   }
@@ -83,8 +121,6 @@ export default function ReadingScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
-
-      {/* Header cố định */}
       <View style={styles.fixedHeader}>
         <View style={styles.timerBox}>
           <Text style={styles.timerText}>⏳ {formatTime(timeLeft)}</Text>
@@ -96,7 +132,6 @@ export default function ReadingScreen() {
         </View>
       </View>
 
-      {/* Nội dung cuộn */}
       <ScrollView
         style={styles.scrollArea}
         contentContainerStyle={styles.scrollContent}
@@ -113,7 +148,6 @@ export default function ReadingScreen() {
 
           return (
             <View key={qId} style={styles.questionBlock}>
-              {/* Tiêu đề câu hỏi + loại */}
               <View style={styles.questionHeader}>
                 <Text style={styles.questionNumber}>Question {index + 1}</Text>
                 <Text style={styles.questionType}>
@@ -121,10 +155,8 @@ export default function ReadingScreen() {
                 </Text>
               </View>
 
-              {/* Nội dung câu hỏi */}
               <Text style={styles.questionText}>{item.questionText}</Text>
 
-              {/* Danh sách đáp án */}
               {item.choices.map((choice, i) => {
                 const selected = isMultiple
                   ? userAnswer.includes(i)
@@ -162,15 +194,13 @@ export default function ReadingScreen() {
   );
 }
 
-// Lấy chiều cao màn hình để xác định chiều cao còn lại
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const FIXED_HEADER_HEIGHT = 220;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F0FDF4" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  loadingText: { fontSize: 16, color: "#6b7280" },
-
+  loadingText: { fontSize: 16, color: "#6b7280", marginTop: 10 },
   fixedHeader: {
     paddingHorizontal: 20,
     paddingTop: Platform.OS === "android" ? 30 : 10,
@@ -197,7 +227,6 @@ const styles = StyleSheet.create({
     color: "#334155",
     textAlign: "justify",
   },
-
   scrollArea: {
     height: SCREEN_HEIGHT - FIXED_HEADER_HEIGHT,
     paddingHorizontal: 20,
@@ -205,12 +234,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
     paddingTop: 10,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1e293b",
-    marginBottom: 10,
   },
   questionBlock: {
     backgroundColor: "#ffffff",

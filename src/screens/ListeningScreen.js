@@ -1,170 +1,368 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
-  ScrollView,
   TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  StatusBar,
   Alert,
+  ScrollView,
+  Platform,
+  Dimensions,
+  ActivityIndicator,
 } from "react-native";
-import { Audio, Sound } from "expo-audio";
+import { Audio } from "expo-av";
+import api from "../services/api";
+import { useNavigation, useRoute } from "@react-navigation/native";
 
-export default function ListeningScreen({ route }) {
+export default function ListeningScreen() {
+  const route = useRoute();
   const { lessonId } = route.params;
+  const navigation = useNavigation();
 
-  const audioUrl =
-    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
-
-  const questions = [
-    {
-      id: "q1",
-      question: "What is the main topic of the audio?",
-      options: ["Weather", "Music", "Technology", "Education"],
-      correct: 2,
-    },
-    {
-      id: "q2",
-      question: "What does the speaker suggest?",
-      options: [
-        "Taking notes",
-        "Buying a ticket",
-        "Reading a book",
-        "Visiting a museum",
-      ],
-      correct: 0,
-    },
-  ];
-
-  const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [lesson, setLesson] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [sound, setSound] = useState(null);
+  const [startTime, setStartTime] = useState(null);
+  const [endTime, setEndTime] = useState(null);
 
-  const playAudio = async () => {
+  const userId = "664abc1234567890abcdef01";
+
+  useEffect(() => {
+    const fetchLesson = async () => {
+      try {
+        const res = await api.get(`/lesson/${lessonId}/listening`);
+        const loadedLesson = res.data;
+        setLesson(loadedLesson);
+        setTimeLeft(loadedLesson.duration * 60);
+
+        const now = new Date();
+        const end = new Date(now.getTime() + loadedLesson.duration * 60000);
+        setStartTime(now);
+        setEndTime(end);
+      } catch (err) {
+        console.error("Failed to load lesson", err);
+        Alert.alert("Error", "Unable to load lesson.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLesson();
+  }, [lessonId]);
+
+  useEffect(() => {
+    if (!timeLeft) return;
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  const formatTime = (seconds) => {
+    const min = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+    return `${min}:${sec < 10 ? "0" : ""}${sec}`;
+  };
+
+  const handlePlayAudio = async () => {
     try {
-      const newSound = new Sound();
-      await newSound.loadAsync({ uri: audioUrl });
-      await newSound.playAsync();
+      if (sound) {
+        await sound.replayAsync();
+        return;
+      }
+      const { sound: newSound } = await Audio.Sound.createAsync({
+        uri: lesson.media[0],
+      });
       setSound(newSound);
+      await newSound.playAsync();
     } catch (err) {
       console.error("Audio play error:", err);
       Alert.alert("Error", "Could not play audio.");
     }
   };
 
-  const selectAnswer = (questionId, index) => {
-    setSelectedAnswers((prev) => ({ ...prev, [questionId]: index }));
+  const handleSelect = (qId, index, type) => {
+    const key = String(qId);
+    setAnswers((prev) => {
+      if (type === "multiple-choice") {
+        const current = prev[key] || [];
+        const updated = current.includes(index)
+          ? current.filter((i) => i !== index)
+          : [...current, index];
+        return { ...prev, [key]: updated };
+      } else {
+        return { ...prev, [key]: index };
+      }
+    });
   };
 
-  useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [sound]);
+  const handleSubmit = () => {
+    Alert.alert("Submit Answers", "Are you sure you want to submit?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "OK",
+        onPress: async () => {
+          setSubmitting(true);
+          try {
+            const res = await api.post("/result/submit", {
+              userId,
+              lessonId,
+              skill: "listening",
+              answers,
+            });
+
+            setTimeout(() => {
+              setSubmitting(false);
+              navigation.navigate("Result", { resultId: res.data.resultId });
+            }, 1500);
+          } catch (err) {
+            setSubmitting(false);
+            console.error("Submit failed", err);
+            Alert.alert("Error", "Could not submit your answers.");
+          }
+        },
+      },
+    ]);
+  };
+
+  if (loading || submitting) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={styles.loadingText}>
+          {loading ? "Loading..." : "Submitting your answers..."}
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>🎧 Listening Practice</Text>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
 
-      <TouchableOpacity style={styles.audioButton} onPress={playAudio}>
-        <Text style={styles.audioButtonText}>▶️ Play Audio</Text>
-      </TouchableOpacity>
+      <View style={styles.lessonHeader}>
+        <Text style={styles.lessonTitle}>{lesson?.title}</Text>
+        <Text style={styles.metaText}>
+          🕒 Start: {startTime?.toLocaleTimeString()}
+        </Text>
+        <Text style={styles.metaText}>
+          ⏰ End: {endTime?.toLocaleTimeString()}
+        </Text>
+      </View>
 
-      {questions.map((q, qIndex) => (
-        <View key={q.id} style={styles.questionBox}>
-          <Text style={styles.questionText}>
-            {qIndex + 1}. {q.question}
-          </Text>
-          {q.options.map((opt, idx) => {
-            const isSelected = selectedAnswers[q.id] === idx;
-            return (
-              <TouchableOpacity
-                key={idx}
-                style={[
-                  styles.optionButton,
-                  isSelected && styles.optionSelected,
-                ]}
-                onPress={() => selectAnswer(q.id, idx)}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    isSelected && styles.optionTextSelected,
-                  ]}
-                >
-                  {opt}
+      <View style={styles.audioBox}>
+        <TouchableOpacity style={styles.audioBtn} onPress={handlePlayAudio}>
+          <Text style={styles.audioText}>▶️ Play Audio</Text>
+        </TouchableOpacity>
+        <Text style={styles.timerText}>⏳ {formatTime(timeLeft)}</Text>
+      </View>
+
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {lesson.questions.map((item, index) => {
+          const qId = String(item._id);
+          const isMultiple = item.type === "multiple-choice";
+
+          const userAnswer = Object.prototype.hasOwnProperty.call(answers, qId)
+            ? answers[qId]
+            : isMultiple
+            ? []
+            : null;
+
+          return (
+            <View key={qId} style={styles.questionBlock}>
+              <View style={styles.questionHeader}>
+                <Text style={styles.questionNumber}>Question {index + 1}</Text>
+                <Text style={styles.questionType}>
+                  [{isMultiple ? "Multiple Choice" : "Single Choice"}]
                 </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      ))}
+              </View>
 
-      <View style={{ height: 40 }} />
-    </ScrollView>
+              <Text style={styles.questionText}>{item.questionText}</Text>
+
+              {item.choices.map((choice, i) => {
+                const selected = isMultiple
+                  ? userAnswer.includes(i)
+                  : userAnswer === i;
+
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.option, selected && styles.optionSelected]}
+                    onPress={() => handleSelect(qId, i, item.type)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.optionRow}>
+                      <Text
+                        style={[
+                          styles.optionText,
+                          selected && styles.optionTextSelected,
+                        ]}
+                      >
+                        {choice}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          );
+        })}
+
+        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+          <Text style={styles.submitText}>Submit Answers</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
+const SCREEN_HEIGHT = Dimensions.get("window").height;
+const FIXED_HEADER_HEIGHT = 220;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f9fafb",
-    paddingHorizontal: 16,
-    paddingTop: 60,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: "#111827",
-    marginBottom: 20,
-  },
-  audioButton: {
-    backgroundColor: "#3b82f6",
-    paddingVertical: 14,
-    borderRadius: 10,
-    marginBottom: 20,
+  container: { flex: 1, backgroundColor: "#F0FDF4" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { fontSize: 16, color: "#6b7280", marginTop: 10 },
+  lessonHeader: {
+    backgroundColor: "#e0f2fe",
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 16,
     alignItems: "center",
+    elevation: 2,
   },
-  audioButtonText: {
+  lessonTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#1e3a8a",
+    marginBottom: 8,
+  },
+  metaText: {
+    fontSize: 14,
+    color: "#475569",
+  },
+  audioBox: {
+    backgroundColor: "#ffffff",
+    padding: 16,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    alignItems: "center",
+    elevation: 1,
+  },
+  audioBtn: {
+    backgroundColor: "#3b82f6",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+  },
+  audioText: {
     color: "#ffffff",
+    fontWeight: "bold",
     fontSize: 16,
+  },
+  timerText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#dc2626",
     fontWeight: "600",
   },
-  questionBox: {
-    marginBottom: 24,
-    padding: 16,
+  scrollArea: {
+    height: SCREEN_HEIGHT - FIXED_HEADER_HEIGHT,
+    paddingHorizontal: 20,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+    paddingTop: 10,
+  },
+  questionBlock: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.03,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
+  },
+  questionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5,
+  },
+  questionNumber: {
+    fontSize: 14,
+    color: "#6b7280",
+    fontWeight: "600",
+  },
+  questionType: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#6b7280",
+    backgroundColor: "#e5e7eb",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   questionText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1f2937",
+    color: "#1e293b",
     marginBottom: 12,
   },
-  optionButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: "#f1f5f9",
-    marginBottom: 8,
+  option: {
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#ffffff",
+    borderWidth: 1.5,
+    borderColor: "#000000",
+    marginBottom: 10,
   },
   optionSelected: {
-    backgroundColor: "#dbeafe",
-    borderColor: "#3b82f6",
-    borderWidth: 1,
+    backgroundColor: "#d1d5db",
+    borderColor: "#000000",
   },
   optionText: {
-    fontSize: 14,
-    color: "#1e293b",
+    fontSize: 15,
+    color: "#111827",
   },
   optionTextSelected: {
-    fontWeight: "600",
-    color: "#1d4ed8",
+    fontWeight: "700",
+    color: "#111827",
+  },
+  optionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  submitBtn: {
+    backgroundColor: "#2563eb",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 50,
+    elevation: 8,
+    shadowColor: "#2563eb",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  submitText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
   },
 });
