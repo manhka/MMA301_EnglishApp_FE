@@ -330,7 +330,7 @@ const TopicCard = ({ topic, level, skill, navigation }) => {
 export default function LessonScreen({ navigation }) {
   const [topics, setTopics] = useState([]);
   const level = "Beginner";
-  const skill = "listening";
+  const skill = "speaking";
 
   useEffect(() => {
     const fetchTopics = async () => {

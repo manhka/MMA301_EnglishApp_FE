@@ -39,7 +39,7 @@ export default function LessonDetailScreen() {
 
   const handleStartLesson = () => {
     if (lesson) {
-      navigation.navigate("Listening", { lessonId: lesson._id });
+      navigation.navigate("Speaking", { lessonId: lesson._id });
     }
   };
 

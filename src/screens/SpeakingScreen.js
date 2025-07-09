@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -6,28 +6,90 @@ import {
   TouchableOpacity,
   Platform,
   Alert,
+  ActivityIndicator,
 } from "react-native";
+import api from "../services/api";
 
 export default function SpeakingScreen({ route }) {
   const { lessonId } = route.params;
 
+  const [lesson, setLesson] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [recorded, setRecorded] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
 
-  // Placeholder speaking prompt
-  const prompt =
-    "Talk about your favorite holiday and explain why you like it.";
+  const intervalRef = useRef(null);
+
+  // Fetch lesson from API
+  useEffect(() => {
+    const fetchLesson = async () => {
+      try {
+        const res = await api.get(`/lesson/${lessonId}/speaking`);
+        const data = res.data;
+
+        setLesson(data);
+        setTimeLeft(data.duration * 60); // convert mins → seconds
+      } catch (err) {
+        console.error("Failed to load speaking lesson", err);
+        Alert.alert("Error", "Unable to load speaking prompt.");
+        // fallback
+        setLesson({
+          title: "Speaking Practice",
+          content:
+            "Talk about your favorite holiday and explain why you like it.",
+          duration: 2,
+        });
+        setTimeLeft(2 * 60);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLesson();
+  }, [lessonId]);
+
+  // Countdown logic
+  useEffect(() => {
+    if (isRecording && timeLeft > 0) {
+      intervalRef.current = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    }
+
+    if (timeLeft === 0 && isRecording) {
+      stopRecording("⏰ Time's up!");
+      submitAnswer(true);
+    }
+
+    return () => clearInterval(intervalRef.current);
+  }, [isRecording, timeLeft]);
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60)
+      .toString()
+      .padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
+
+  const stopRecording = (message) => {
+    setIsRecording(false);
+    setRecorded(true);
+    clearInterval(intervalRef.current);
+    Alert.alert(
+      "🛑 Recording Stopped",
+      message || "Your answer has been saved."
+    );
+  };
 
   const handleRecord = () => {
     if (isRecording) {
-      // Stop recording
-      setIsRecording(false);
-      setRecorded(true);
-      Alert.alert("🛑 Recording Stopped", "Your answer has been saved.");
+      stopRecording();
     } else {
-      // Start recording
       setIsRecording(true);
       setRecorded(false);
+      setTimeLeft(lesson.duration * 60); // reset countdown
       Alert.alert("🎤 Recording Started", "Speak now...");
     }
   };
@@ -36,23 +98,50 @@ export default function SpeakingScreen({ route }) {
     Alert.alert("🔊 Playback", "Playing your recorded answer... (placeholder)");
   };
 
-  const handleSubmit = () => {
+  const submitAnswer = (auto = false) => {
     if (!recorded) {
-      Alert.alert("❗No Recording", "Please record your answer first.");
+      if (!auto) {
+        Alert.alert("❗No Recording", "Please record your answer first.");
+      }
       return;
     }
-    Alert.alert("✅ Submitted", "Your speaking response has been submitted.");
+
+    Alert.alert(
+      "✅ Submitted",
+      auto
+        ? "Your response was automatically submitted."
+        : "Your speaking response has been submitted."
+    );
   };
+
+  const handleSubmit = () => {
+    submitAnswer(false);
+  };
+
+  if (isLoading || !lesson) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={{ marginTop: 10, color: "#6b7280" }}>
+          Loading lesson...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🗣️ Speaking Practice</Text>
-      <Text style={styles.lessonId}>Lesson ID: {lessonId}</Text>
+      <Text style={styles.title}>🗣️ {lesson.title}</Text>
+      <Text style={styles.lessonId}>Duration: {lesson.duration} mins</Text>
 
       <View style={styles.promptContainer}>
         <Text style={styles.promptTitle}>🎯 Prompt</Text>
-        <Text style={styles.promptText}>{prompt}</Text>
+        <Text style={styles.promptText}>{lesson.content}</Text>
       </View>
+
+      {isRecording && (
+        <Text style={styles.timer}>⏳ Time left: {formatTime(timeLeft)}</Text>
+      )}
 
       <TouchableOpacity
         style={[styles.recordButton, isRecording && styles.recording]}
@@ -86,6 +175,7 @@ export default function SpeakingScreen({ route }) {
   );
 }
 
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -102,7 +192,7 @@ const styles = StyleSheet.create({
   lessonId: {
     fontSize: 14,
     color: "#6b7280",
-    marginBottom: 16,
+    marginBottom: 4,
   },
   promptContainer: {
     backgroundColor: "#fff",
@@ -141,6 +231,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
+  timer: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#dc2626",
+    textAlign: "center",
+    marginBottom: 12,
+  },
   playbackButton: {
     backgroundColor: "#3b82f6",
     paddingVertical: 14,
@@ -163,5 +260,11 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f9fafb",
   },
 });
