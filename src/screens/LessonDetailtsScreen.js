@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -10,6 +9,7 @@ import {
   Platform,
   TouchableOpacity,
   Alert,
+  StatusBar,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import api from "../services/api";
@@ -39,8 +39,12 @@ export default function LessonDetailScreen() {
 
   const handleStartLesson = () => {
     if (lesson) {
-      navigation.navigate("Speaking", { lessonId: lesson._id });
+      navigation.navigate("Writing", { lessonId: lesson._id });
     }
+  };
+
+  const handleBack = () => {
+    navigation.goBack();
   };
 
   if (loading) {
@@ -93,80 +97,93 @@ export default function LessonDetailScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
-        <View style={styles.metaContainer}>
-          <View
-            style={[
-              styles.difficultyBadge,
-              getDifficultyStyle(level),
-              {
-                borderWidth: 1,
-                borderColor: getDifficultyStyle(level).borderColor,
-              },
-            ]}
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          {/* Back Button */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleBack}
+            activeOpacity={0.7}
           >
-            <Text
-              style={{
-                color: getDifficultyStyle(level).color,
-                fontWeight: "600",
-                fontSize: 12,
-              }}
-            >
-              {level}
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+
+          <View style={styles.headerContent}>
+            <Text style={styles.title}>{title}</Text>
+            <View style={styles.metaContainer}>
+              <View
+                style={[
+                  styles.difficultyBadge,
+                  getDifficultyStyle(level),
+                  {
+                    borderWidth: 1,
+                    borderColor: getDifficultyStyle(level).borderColor,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    color: getDifficultyStyle(level).color,
+                    fontWeight: "600",
+                    fontSize: 12,
+                  }}
+                >
+                  {level}
+                </Text>
+              </View>
+              <Text style={styles.skillText}>
+                📚 {skill.charAt(0).toUpperCase() + skill.slice(1)}
+              </Text>
+            </View>
+            <Text style={styles.topic}>🔖 Topic: {topicId?.name || "N/A"}</Text>
+            <Text style={styles.duration}>
+              ⏰ Estimated time: {duration || "N/A"} minutes
             </Text>
           </View>
-          <Text style={styles.skillText}>
-            📚 {skill.charAt(0).toUpperCase() + skill.slice(1)}
-          </Text>
         </View>
-        <Text style={styles.topic}>🔖 Topic: {topicId?.name || "N/A"}</Text>
-        <Text style={styles.duration}>
-          ⏰ Estimated time: {duration || "N/A"} minutes
-        </Text>
-      </View>
 
-      {media && media.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎬 Media</Text>
-          {media.map((url, idx) => (
-            <Text key={idx} style={styles.mediaLink}>
-              {url}
+        {media && media.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🎬 Media</Text>
+            {media.map((url, idx) => (
+              <Text key={idx} style={styles.mediaLink}>
+                {url}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {questions && questions.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>❓ Quiz Questions</Text>
+            <Text style={styles.content}>
+              This lesson includes {questions.length} question(s) to test your
+              knowledge.
             </Text>
-          ))}
+          </View>
+        )}
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={handleStartLesson}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.startButtonText}>🚀 Start Lesson</Text>
+          </TouchableOpacity>
         </View>
-      )}
-
-      {questions && questions.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>❓ Quiz Questions</Text>
-          <Text style={styles.content}>
-            This lesson includes {questions.length} question(s) to test your
-            knowledge.
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.startButton}
-          onPress={handleStartLesson}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.startButtonText}>🚀 Start Lesson</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={{ height: 60 }} />
-    </ScrollView>
+        <View style={{ height: 60 }} />
+      </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#F0FDF4",
   },
   center: {
     flex: 1,
@@ -202,6 +219,33 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
     marginBottom: 15,
+    position: "relative",
+  },
+  // Back Button Styles
+  backButton: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 85 : 65,
+    left: 25,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  backIcon: {
+    fontSize: 20,
+    color: "#374151",
+    fontWeight: "600",
+  },
+  headerContent: {
+    paddingTop: 20,
   },
   title: {
     fontSize: 28,
@@ -209,11 +253,13 @@ const styles = StyleSheet.create({
     color: "#1f2937",
     marginBottom: 10,
     lineHeight: 36,
+    textAlign: "center",
   },
   metaContainer: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 8,
+    justifyContent: "center",
   },
   difficultyBadge: {
     paddingHorizontal: 10,
@@ -232,12 +278,14 @@ const styles = StyleSheet.create({
     color: "#374151",
     marginTop: 6,
     fontWeight: "500",
+    textAlign: "center",
   },
   duration: {
     fontSize: 15,
     color: "#059669",
     marginTop: 6,
     fontWeight: "500",
+    textAlign: "center",
   },
   section: {
     backgroundColor: "#fff",

@@ -9,6 +9,7 @@ import {
   Dimensions,
   Alert,
   Platform,
+  StatusBar,
 } from "react-native";
 import api from "../services/api";
 
@@ -156,7 +157,6 @@ const LessonItem = ({ lesson, index, isLocked, navigation }) => {
               </View>
             )}
           </View>
-
           <View style={styles.lessonContent}>
             <View style={styles.lessonHeader}>
               <View style={styles.lessonTitleRow}>
@@ -179,7 +179,6 @@ const LessonItem = ({ lesson, index, isLocked, navigation }) => {
           </View>
         </View>
       </TouchableOpacity>
-
       <TouchableOpacity
         style={[
           styles.lessonButton,
@@ -330,7 +329,7 @@ const TopicCard = ({ topic, level, skill, navigation }) => {
 export default function LessonScreen({ navigation }) {
   const [topics, setTopics] = useState([]);
   const level = "Beginner";
-  const skill = "speaking";
+  const skill = "reading";
 
   useEffect(() => {
     const fetchTopics = async () => {
@@ -341,41 +340,59 @@ export default function LessonScreen({ navigation }) {
         Alert.alert("Error", "Failed to load topics");
       }
     };
+
     fetchTopics();
   }, []);
 
+  const handleBack = () => {
+    navigation.goBack();
+  };
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          📚 {skill.charAt(0).toUpperCase() + skill.slice(1)}
-        </Text>
-        <Text style={styles.headerSubtitle}>
-          💪 Practice makes you perfect!
-        </Text>
-      </View>
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          {/* Back Button */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleBack}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
 
-      {Array.isArray(topics) && topics.length > 0 ? (
-        topics.map((topic, index) => (
-          <TopicCard
-            key={topic._id}
-            topic={topic}
-            level={level}
-            skill={skill}
-            navigation={navigation}
-          />
-        ))
-      ) : (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>📖 No topics available</Text>
-          <Text style={styles.emptySubtext}>
-            Check back later for new content
-          </Text>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>
+              📚 {skill.charAt(0).toUpperCase() + skill.slice(1)}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              💪 Practice makes you perfect!
+            </Text>
+          </View>
         </View>
-      )}
 
-      <View style={{ height: 60 }} />
-    </ScrollView>
+        {Array.isArray(topics) && topics.length > 0 ? (
+          topics.map((topic, index) => (
+            <TopicCard
+              key={topic._id}
+              topic={topic}
+              level={level}
+              skill={skill}
+              navigation={navigation}
+            />
+          ))
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>📖 No topics available</Text>
+            <Text style={styles.emptySubtext}>
+              Check back later for new content
+            </Text>
+          </View>
+        )}
+        <View style={{ height: 60 }} />
+      </ScrollView>
+    </>
   );
 }
 
@@ -396,6 +413,33 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    position: "relative",
+  },
+  // Back Button Styles
+  backButton: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 85 : 65,
+    left: 20,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  backIcon: {
+    fontSize: 20,
+    color: "#374151",
+    fontWeight: "600",
+  },
+  headerContent: {
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 28,

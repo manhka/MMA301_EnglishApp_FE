@@ -10,6 +10,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import api from "../services/api";
@@ -31,15 +32,12 @@ export default function DashboardScreen({ navigation, route }) {
         const userId = await SecureStore.getItemAsync("userId");
         const level =
           (await SecureStore.getItemAsync("selectedLevel")) || "Beginner";
-
         if (!userId) {
           navigation.replace("Login");
           return;
         }
-
         const res = await api.get(`/${userId}/${level}/progress`);
         const { progress } = res.data;
-
         const skillsFormatted = [
           {
             id: 1,
@@ -70,7 +68,6 @@ export default function DashboardScreen({ navigation, route }) {
             progress: progress.skills.writing || 0,
           },
         ];
-
         setSkills(skillsFormatted);
         setLoading(false);
       } catch (err) {
@@ -82,6 +79,15 @@ export default function DashboardScreen({ navigation, route }) {
 
     fetchProgress();
   }, []);
+
+  const handleBack = async () => {
+    try {
+      await SecureStore.setItemAsync("level", "Beginner");
+      navigation.navigate("Home");
+    } catch (error) {
+      console.error("Failed to store secure item:", error);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert("Confirm Logout", "Are you sure you want to logout?", [
@@ -186,92 +192,108 @@ export default function DashboardScreen({ navigation, route }) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.profileContainer}
-            onPress={() => setShowDropdown(!showDropdown)}
-          >
-            <View style={styles.avatar}>
-              <Text style={{ color: "#fff" }}>👤</Text>
-            </View>
-            <Text style={styles.userName}>{userName}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Dropdown */}
-        {showDropdown && (
-          <View style={styles.dropdownMenu}>
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView style={styles.container}>
+          {/* Header với Back Button */}
+          <View style={styles.header}>
+            {/* Thêm Back Button */}
             <TouchableOpacity
-              style={styles.dropdownItem}
-              onPress={() => {
-                setShowDropdown(false);
-                setShowLearning(true);
-              }}
+              style={styles.backButton}
+              onPress={handleBack}
+              activeOpacity={0.7}
             >
-              <Text>📊 My Learning</Text>
+              <Text style={styles.backButtonText}>←</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
-              style={styles.dropdownItem}
-              onPress={handleLogout}
+              style={styles.profileContainer}
+              onPress={() => setShowDropdown(!showDropdown)}
             >
-              <Text>🚪 Logout</Text>
+              <Text style={styles.userName}>{userName}</Text>
+
+              <View style={styles.avatar}>
+                <Text style={{ color: "#fff" }}>👤</Text>
+              </View>
             </TouchableOpacity>
           </View>
-        )}
 
-        {/* Skills Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Skills</Text>
-          <View style={styles.skillsGrid}>{skills.map(renderSkill)}</View>
-        </View>
+          {/* Dropdown */}
+          {showDropdown && (
+            <View style={styles.dropdownMenu}>
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setShowDropdown(false);
+                  setShowLearning(true);
+                }}
+              >
+                <Text>📊 My Learning</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={handleLogout}
+              >
+                <Text>🚪 Logout</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-        {/* Tabs */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              selectedTab === "recommendations" && styles.activeTab,
-            ]}
-            onPress={() => setSelectedTab("recommendations")}
-          >
-            <Text
+          {/* Skills Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your Skills</Text>
+            <View style={styles.skillsGrid}>{skills.map(renderSkill)}</View>
+          </View>
+
+          {/* Tabs */}
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
               style={[
-                styles.tabText,
-                selectedTab === "recommendations" && styles.activeTabText,
+                styles.tab,
+                selectedTab === "recommendations" && styles.activeTab,
               ]}
+              onPress={() => setSelectedTab("recommendations")}
             >
-              Recommendations
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === "history" && styles.activeTab]}
-            onPress={() => setSelectedTab("history")}
-          >
-            <Text
+              <Text
+                style={[
+                  styles.tabText,
+                  selectedTab === "recommendations" && styles.activeTabText,
+                ]}
+              >
+                Recommendations
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[
-                styles.tabText,
-                selectedTab === "history" && styles.activeTabText,
+                styles.tab,
+                selectedTab === "history" && styles.activeTab,
               ]}
+              onPress={() => setSelectedTab("history")}
             >
-              History
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <Text
+                style={[
+                  styles.tabText,
+                  selectedTab === "history" && styles.activeTabText,
+                ]}
+              >
+                History
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* Dynamic content */}
-        <View style={styles.contentSection}>
-          {selectedTab === "recommendations"
-            ? renderRecommended()
-            : renderHistory()}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          {/* Dynamic content */}
+          <View style={styles.contentSection}>
+            {selectedTab === "recommendations"
+              ? renderRecommended()
+              : renderHistory()}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </>
   );
 }
 
@@ -281,9 +303,24 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between", // Thay đổi để có space giữa back button và profile
     paddingTop: Platform.OS === "ios" ? 80 : 60,
     paddingBottom: 20,
     paddingHorizontal: 20,
+  },
+  // Thêm style cho back button
+  backButton: {
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.2)",
+  },
+  backButtonText: {
+    color: "#1e293b",
+    fontSize: 16,
+    fontWeight: "600",
   },
   profileContainer: { flexDirection: "row", alignItems: "center" },
   avatar: {
@@ -295,11 +332,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 8,
   },
-  userName: { fontSize: 18, fontWeight: "bold", color: "#111827" },
+  userName: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#111827",
+    marginEnd: 10,
+  },
   dropdownMenu: {
     position: "absolute",
     top: 120,
-    left: 20,
+    right: 20,
     backgroundColor: "#fff",
     borderRadius: 8,
     shadowColor: "#000",
@@ -309,7 +351,6 @@ const styles = StyleSheet.create({
     width: 160,
     zIndex: 999,
   },
-
   dropdownItem: { padding: 12 },
   section: { paddingHorizontal: 20, marginBottom: 16 },
   sectionTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 12 },

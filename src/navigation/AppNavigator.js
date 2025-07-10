@@ -12,6 +12,7 @@ import ListeningScreen from "../screens/ListeningScreen";
 import WritingScreen from "../screens/WritingScreen";
 import SpeakingScreen from "../screens/SpeakingScreen";
 import ResultScreen from "../screens/ResultScreen";
+import Result2Screen from "../screens/Result2Screen";
 
 const Stack = createNativeStackNavigator();
 
@@ -25,6 +26,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -33,6 +35,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -41,6 +44,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -49,6 +53,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -57,6 +62,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -65,6 +71,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -73,6 +80,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -81,6 +89,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -89,6 +98,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -97,6 +107,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -105,6 +116,16 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="Result2"
+          component={Result2Screen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
       </Stack.Navigator>
