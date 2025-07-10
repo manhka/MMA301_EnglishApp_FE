@@ -11,7 +11,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  SafeAreaView,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
 import api from "../services/api";
 
@@ -19,6 +21,7 @@ const { width } = Dimensions.get("window");
 
 export default function DashboardScreen({ navigation, route }) {
   const userName = route.params?.userName || "Student";
+  const userLevel = route.params?.level || "Beginner";
   const [skills, setSkills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState("recommendations");
@@ -31,13 +34,18 @@ export default function DashboardScreen({ navigation, route }) {
       try {
         const userId = await SecureStore.getItemAsync("userId");
         const level =
-          (await SecureStore.getItemAsync("selectedLevel")) || "Beginner";
+          userLevel ||
+          (await SecureStore.getItemAsync("selectedLevel")) ||
+          "Beginner";
+
         if (!userId) {
           navigation.replace("Login");
           return;
         }
+
         const res = await api.get(`/${userId}/${level}/progress`);
         const { progress } = res.data;
+
         const skillsFormatted = [
           {
             id: 1,
@@ -50,24 +58,25 @@ export default function DashboardScreen({ navigation, route }) {
             id: 2,
             name: "Reading",
             icon: "📖",
-            color: "#3B82F6",
+            color: "#059669",
             progress: progress.skills.reading || 0,
           },
           {
             id: 3,
             name: "Speaking",
             icon: "🗣️",
-            color: "#F59E0B",
+            color: "#047857",
             progress: progress.skills.speaking || 0,
           },
           {
             id: 4,
             name: "Writing",
             icon: "✍️",
-            color: "#8B5CF6",
+            color: "#065f46",
             progress: progress.skills.writing || 0,
           },
         ];
+
         setSkills(skillsFormatted);
         setLoading(false);
       } catch (err) {
@@ -78,7 +87,36 @@ export default function DashboardScreen({ navigation, route }) {
     };
 
     fetchProgress();
-  }, []);
+  }, [userLevel]);
+
+  const getLevelStyle = (level) => {
+    switch (level) {
+      case "Beginner":
+        return {
+          backgroundColor: "#dcfce7",
+          color: "#166534",
+          borderColor: "#86efac",
+        };
+      case "Intermediate":
+        return {
+          backgroundColor: "#fef3c7",
+          color: "#92400e",
+          borderColor: "#fbbf24",
+        };
+      case "Advanced":
+        return {
+          backgroundColor: "#fecaca",
+          color: "#991b1b",
+          borderColor: "#f87171",
+        };
+      default:
+        return {
+          backgroundColor: "#f3f4f6",
+          color: "#374151",
+          borderColor: "#d1d5db",
+        };
+    }
+  };
 
   const handleBack = async () => {
     try {
@@ -109,25 +147,41 @@ export default function DashboardScreen({ navigation, route }) {
     <TouchableOpacity
       key={skill.id}
       style={[styles.skillCard, { borderColor: skill.color }]}
-      onPress={() => navigation.navigate("Lesson", { skill: skill.name })}
+      onPress={() =>
+        navigation.navigate("Lesson", {
+          level: userLevel,
+          skill: skill.name.toLowerCase(),
+        })
+      }
+      activeOpacity={0.8}
     >
-      <Text style={styles.skillIcon}>{skill.icon}</Text>
-      <Text style={styles.skillTitle}>{skill.name}</Text>
-      <View style={styles.progressBar}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${skill.progress}%`, backgroundColor: skill.color },
-          ]}
-        />
+      <View style={styles.skillHeader}>
+        <Text style={styles.skillIcon}>{skill.icon}</Text>
+        <View style={[styles.skillBadge, { backgroundColor: skill.color }]}>
+          <Text style={styles.skillBadgeText}>{skill.progress}%</Text>
+        </View>
       </View>
-      <Text style={styles.progressText}>{skill.progress}%</Text>
+      <Text style={styles.skillTitle}>{skill.name}</Text>
+      <View style={styles.progressContainer}>
+        <View style={styles.progressBar}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${skill.progress}%`, backgroundColor: skill.color },
+            ]}
+          />
+        </View>
+        <Text style={styles.progressLabel}>Progress</Text>
+      </View>
     </TouchableOpacity>
   );
 
   const renderRecommended = () => (
     <>
-      <Text style={styles.sectionTitle}>Recommended Lessons</Text>
+      <View style={styles.sectionHeader}>
+        <Ionicons name="star-outline" size={24} color="#10b981" />
+        <Text style={styles.sectionTitle}>Recommended for You</Text>
+      </View>
       {[
         {
           id: 1,
@@ -135,6 +189,7 @@ export default function DashboardScreen({ navigation, route }) {
           skill: "Reading",
           duration: "15 min",
           level: "Intermediate",
+          difficulty: "Medium",
         },
         {
           id: 2,
@@ -142,21 +197,63 @@ export default function DashboardScreen({ navigation, route }) {
           skill: "Writing",
           duration: "20 min",
           level: "Beginner",
+          difficulty: "Easy",
+        },
+        {
+          id: 3,
+          title: "Listening for Details",
+          skill: "Listening",
+          duration: "12 min",
+          level: userLevel,
+          difficulty: "Medium",
         },
       ].map((lesson) => (
-        <View key={lesson.id} style={styles.lessonCard}>
-          <Text style={styles.lessonTitle}>{lesson.title}</Text>
-          <Text style={styles.lessonDetail}>
-            {lesson.skill} • {lesson.duration} • {lesson.level}
-          </Text>
-        </View>
+        <TouchableOpacity
+          key={lesson.id}
+          style={styles.lessonCard}
+          activeOpacity={0.7}
+        >
+          <View style={styles.lessonHeader}>
+            <View style={styles.lessonTitleContainer}>
+              <Text style={styles.lessonTitle}>{lesson.title}</Text>
+              <View style={[styles.levelBadge, getLevelStyle(lesson.level)]}>
+                <Text
+                  style={[
+                    styles.levelBadgeText,
+                    { color: getLevelStyle(lesson.level).color },
+                  ]}
+                >
+                  {lesson.level}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#10b981" />
+          </View>
+          <View style={styles.lessonMeta}>
+            <View style={styles.metaItem}>
+              <Ionicons name="book-outline" size={16} color="#64748b" />
+              <Text style={styles.lessonDetail}>{lesson.skill}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Ionicons name="time-outline" size={16} color="#64748b" />
+              <Text style={styles.lessonDetail}>{lesson.duration}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Ionicons name="trending-up-outline" size={16} color="#64748b" />
+              <Text style={styles.lessonDetail}>{lesson.difficulty}</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
       ))}
     </>
   );
 
   const renderHistory = () => (
     <>
-      <Text style={styles.sectionTitle}>Recent History</Text>
+      <View style={styles.sectionHeader}>
+        <Ionicons name="time-outline" size={24} color="#10b981" />
+        <Text style={styles.sectionTitle}>Recent Activity</Text>
+      </View>
       {[
         {
           id: 1,
@@ -164,6 +261,7 @@ export default function DashboardScreen({ navigation, route }) {
           skill: "Reading",
           date: "Yesterday",
           score: 80,
+          status: "completed",
         },
         {
           id: 2,
@@ -171,53 +269,106 @@ export default function DashboardScreen({ navigation, route }) {
           skill: "Speaking",
           date: "2 days ago",
           score: 75,
+          status: "completed",
+        },
+        {
+          id: 3,
+          title: "Listening Exercise",
+          skill: "Listening",
+          date: "3 days ago",
+          score: 90,
+          status: "completed",
         },
       ].map((h) => (
-        <View key={h.id} style={styles.lessonCard}>
-          <Text style={styles.lessonTitle}>{h.title}</Text>
-          <Text style={styles.lessonDetail}>
-            {h.skill} • {h.date} • Score {h.score}%
-          </Text>
-        </View>
+        <TouchableOpacity
+          key={h.id}
+          style={styles.historyCard}
+          activeOpacity={0.7}
+        >
+          <View style={styles.historyHeader}>
+            <View style={styles.historyTitleContainer}>
+              <Text style={styles.historyTitle}>{h.title}</Text>
+              <View style={styles.scoreContainer}>
+                <Ionicons name="trophy-outline" size={16} color="#f59e0b" />
+                <Text style={styles.scoreText}>{h.score}%</Text>
+              </View>
+            </View>
+            <View style={[styles.statusBadge, styles.completedBadge]}>
+              <Text style={styles.statusText}>Completed</Text>
+            </View>
+          </View>
+          <View style={styles.historyMeta}>
+            <View style={styles.metaItem}>
+              <Ionicons name="book-outline" size={16} color="#64748b" />
+              <Text style={styles.lessonDetail}>{h.skill}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Ionicons name="calendar-outline" size={16} color="#64748b" />
+              <Text style={styles.lessonDetail}>{h.date}</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
       ))}
     </>
   );
 
   if (loading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#059669" />
-      </View>
+      <SafeAreaView style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
+        <View style={styles.loadingContent}>
+          <ActivityIndicator size="large" color="#10b981" />
+          <Text style={styles.loadingText}>Loading your dashboard...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <ScrollView style={styles.container}>
-          {/* Header với Back Button */}
+        <ScrollView
+          style={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Enhanced Header */}
           <View style={styles.header}>
-            {/* Thêm Back Button */}
             <TouchableOpacity
               style={styles.backButton}
               onPress={handleBack}
               activeOpacity={0.7}
             >
-              <Text style={styles.backButtonText}>←</Text>
+              <Ionicons name="arrow-back" size={24} color="#1e293b" />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.profileContainer}
-              onPress={() => setShowDropdown(!showDropdown)}
-            >
-              <Text style={styles.userName}>{userName}</Text>
+            <View style={styles.headerCenter}>
+              <Text style={styles.welcomeText}>Welcome back!</Text>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{userName}</Text>
+                <View style={[styles.levelBadge, getLevelStyle(userLevel)]}>
+                  <Text
+                    style={[
+                      styles.levelBadgeText,
+                      { color: getLevelStyle(userLevel).color },
+                    ]}
+                  >
+                    {userLevel}
+                  </Text>
+                </View>
+              </View>
+            </View>
 
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={() => setShowDropdown(!showDropdown)}
+              activeOpacity={0.7}
+            >
               <View style={styles.avatar}>
-                <Text style={{ color: "#fff" }}>👤</Text>
+                <Ionicons name="person" size={20} color="#fff" />
               </View>
             </TouchableOpacity>
           </View>
@@ -231,58 +382,82 @@ export default function DashboardScreen({ navigation, route }) {
                   setShowDropdown(false);
                   setShowLearning(true);
                 }}
+                activeOpacity={0.7}
               >
-                <Text>📊 My Learning</Text>
+                <Ionicons name="analytics-outline" size={20} color="#64748b" />
+                <Text style={styles.dropdownText}>My Learning</Text>
               </TouchableOpacity>
+              <View style={styles.dropdownDivider} />
               <TouchableOpacity
                 style={styles.dropdownItem}
                 onPress={handleLogout}
+                activeOpacity={0.7}
               >
-                <Text>🚪 Logout</Text>
+                <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+                <Text style={[styles.dropdownText, { color: "#ef4444" }]}>
+                  Logout
+                </Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* Skills Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your Skills</Text>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="library-outline" size={24} color="#10b981" />
+              <Text style={styles.sectionTitle}>Your Skills</Text>
+            </View>
             <View style={styles.skillsGrid}>{skills.map(renderSkill)}</View>
           </View>
 
           {/* Tabs */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[
-                styles.tab,
-                selectedTab === "recommendations" && styles.activeTab,
-              ]}
-              onPress={() => setSelectedTab("recommendations")}
-            >
-              <Text
+          <View style={styles.tabSection}>
+            <View style={styles.tabContainer}>
+              <TouchableOpacity
                 style={[
-                  styles.tabText,
-                  selectedTab === "recommendations" && styles.activeTabText,
+                  styles.tab,
+                  selectedTab === "recommendations" && styles.activeTab,
                 ]}
+                onPress={() => setSelectedTab("recommendations")}
+                activeOpacity={0.7}
               >
-                Recommendations
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.tab,
-                selectedTab === "history" && styles.activeTab,
-              ]}
-              onPress={() => setSelectedTab("history")}
-            >
-              <Text
+                <Ionicons
+                  name="star-outline"
+                  size={20}
+                  color={selectedTab === "recommendations" ? "#fff" : "#64748b"}
+                />
+                <Text
+                  style={[
+                    styles.tabText,
+                    selectedTab === "recommendations" && styles.activeTabText,
+                  ]}
+                >
+                  Recommended
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[
-                  styles.tabText,
-                  selectedTab === "history" && styles.activeTabText,
+                  styles.tab,
+                  selectedTab === "history" && styles.activeTab,
                 ]}
+                onPress={() => setSelectedTab("history")}
+                activeOpacity={0.7}
               >
-                History
-              </Text>
-            </TouchableOpacity>
+                <Ionicons
+                  name="time-outline"
+                  size={20}
+                  color={selectedTab === "history" ? "#fff" : "#64748b"}
+                />
+                <Text
+                  style={[
+                    styles.tabText,
+                    selectedTab === "history" && styles.activeTabText,
+                  ]}
+                >
+                  History
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Dynamic content */}
@@ -291,109 +466,412 @@ export default function DashboardScreen({ navigation, route }) {
               ? renderRecommended()
               : renderHistory()}
           </View>
+
+          <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F0FDF4" },
-  loading: { flex: 1, justifyContent: "center", alignItems: "center" },
+  container: {
+    flex: 1,
+    backgroundColor: "#F0FDF4",
+  },
+
+  scrollContainer: {
+    flex: 1,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: "#F0FDF4",
+  },
+
+  loadingContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  loadingText: {
+    fontSize: 16,
+    color: "#64748b",
+    marginTop: 12,
+    fontWeight: "500",
+  },
+
+  // Enhanced Header
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between", // Thay đổi để có space giữa back button và profile
-    paddingTop: Platform.OS === "ios" ? 80 : 60,
+    justifyContent: "space-between",
+    paddingTop: Platform.OS === "ios" ? 20 : 20,
     paddingBottom: 20,
     paddingHorizontal: 20,
+    backgroundColor: "#ffffff",
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  // Thêm style cho back button
+
   backButton: {
-    backgroundColor: "rgba(0, 0, 0, 0.1)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.2)",
+    backgroundColor: "#f1f5f9",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  backButtonText: {
+
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  welcomeText: {
+    fontSize: 14,
+    color: "#64748b",
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+
+  userInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  userName: {
+    fontSize: 20,
+    fontWeight: "700",
     color: "#1e293b",
-    fontSize: 16,
+    marginRight: 8,
+  },
+
+  levelBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+
+  levelBadgeText: {
+    fontSize: 12,
     fontWeight: "600",
   },
-  profileContainer: { flexDirection: "row", alignItems: "center" },
+
+  profileButton: {
+    width: 40,
+    height: 40,
+  },
+
   avatar: {
-    backgroundColor: "#059669",
+    backgroundColor: "#10b981",
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
   },
-  userName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#111827",
-    marginEnd: 10,
-  },
+
+  // Dropdown
   dropdownMenu: {
     position: "absolute",
     top: 120,
     right: 20,
     backgroundColor: "#fff",
-    borderRadius: 8,
+    borderRadius: 12,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 6,
-    width: 160,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    width: 180,
     zIndex: 999,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
-  dropdownItem: { padding: 12 },
-  section: { paddingHorizontal: 20, marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 12 },
+
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+  },
+
+  dropdownText: {
+    fontSize: 16,
+    color: "#374151",
+    marginLeft: 12,
+    fontWeight: "500",
+  },
+
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: "#e2e8f0",
+    marginHorizontal: 16,
+  },
+
+  // Sections
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    marginTop: 24,
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1e293b",
+    marginLeft: 8,
+  },
+
+  // Skills Grid
   skillsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
+
   skillCard: {
     width: (width - 64) / 2,
     backgroundColor: "#FFF",
     borderWidth: 2,
     borderRadius: 16,
     padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  skillHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+
+  skillIcon: {
+    fontSize: 32,
+  },
+
+  skillBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+
+  skillBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#fff",
+  },
+
+  skillTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1e293b",
     marginBottom: 12,
   },
-  skillIcon: { fontSize: 28, marginBottom: 8 },
-  skillTitle: { fontSize: 16, fontWeight: "bold" },
+
+  progressContainer: {
+    marginTop: 8,
+  },
+
   progressBar: {
     height: 6,
     backgroundColor: "#E5E7EB",
     borderRadius: 3,
-    marginVertical: 4,
+    marginBottom: 4,
   },
-  progressFill: { height: "100%", borderRadius: 3 },
-  progressText: { fontSize: 12, color: "#6B7280" },
+
+  progressFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+
+  progressLabel: {
+    fontSize: 12,
+    color: "#64748b",
+    fontWeight: "500",
+  },
+
+  // Tabs
+  tabSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+
   tabContainer: {
     flexDirection: "row",
     backgroundColor: "#fff",
-    margin: 20,
+    borderRadius: 12,
+    padding: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
   },
-  tab: { flex: 1, padding: 12, alignItems: "center" },
-  activeTab: { backgroundColor: "#059669" },
-  tabText: { color: "#6B7280", fontWeight: "600" },
-  activeTabText: { color: "#fff" },
-  contentSection: { paddingHorizontal: 20 },
+
+  activeTab: {
+    backgroundColor: "#10b981",
+  },
+
+  tabText: {
+    color: "#64748b",
+    fontWeight: "600",
+    fontSize: 14,
+    marginLeft: 6,
+  },
+
+  activeTabText: {
+    color: "#fff",
+  },
+
+  // Content
+  contentSection: {
+    paddingHorizontal: 20,
+  },
+
+  // Lesson Cards
   lessonCard: {
     backgroundColor: "#FFF",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  lessonTitle: { fontSize: 16, fontWeight: "bold", color: "#111827" },
-  lessonDetail: { fontSize: 12, color: "#6B7280", marginTop: 4 },
+
+  lessonHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+
+  lessonTitleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+
+  lessonTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1e293b",
+    marginBottom: 6,
+  },
+
+  lessonMeta: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+  },
+
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  lessonDetail: {
+    fontSize: 14,
+    color: "#64748b",
+    marginLeft: 4,
+    fontWeight: "500",
+  },
+
+  // History Cards
+  historyCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  historyHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+
+  historyTitleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+
+  historyTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1e293b",
+    marginBottom: 6,
+  },
+
+  scoreContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  scoreText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#f59e0b",
+    marginLeft: 4,
+  },
+
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+
+  completedBadge: {
+    backgroundColor: "#ecfdf5",
+  },
+
+  statusText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#059669",
+  },
+
+  historyMeta: {
+    flexDirection: "row",
+    gap: 16,
+  },
 });

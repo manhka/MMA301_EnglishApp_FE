@@ -11,6 +11,8 @@ import {
   Alert,
   StatusBar,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+
 import { useNavigation, useRoute } from "@react-navigation/native";
 import api from "../services/api";
 
@@ -36,10 +38,11 @@ export default function LessonDetailScreen() {
 
     fetchLesson();
   }, [lessonId]);
-
+  const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1);
   const handleStartLesson = () => {
     if (lesson) {
-      navigation.navigate("Writing", { lessonId: lesson._id });
+      const screen = capitalize(skill);
+      navigation.navigate(screen, { lessonId: lesson._id });
     }
   };
 
@@ -107,7 +110,7 @@ export default function LessonDetailScreen() {
             onPress={handleBack}
             activeOpacity={0.7}
           >
-            <Text style={styles.backIcon}>←</Text>
+            <Ionicons name="arrow-back" size={24} color="#1e293b" />
           </TouchableOpacity>
 
           <View style={styles.headerContent}>
@@ -207,7 +210,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   header: {
-    paddingTop: Platform.OS === "ios" ? 80 : 60,
+    paddingTop: Platform.OS === "ios" ? 80 : 10,
     paddingHorizontal: 25,
     paddingBottom: 25,
     backgroundColor: "#fff",
@@ -223,21 +226,12 @@ const styles = StyleSheet.create({
   },
   // Back Button Styles
   backButton: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 85 : 65,
-    left: 25,
-    zIndex: 10,
     width: 40,
     height: 40,
-    backgroundColor: "rgba(0, 0, 0, 0.1)",
     borderRadius: 20,
+    backgroundColor: "#f1f5f9",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   backIcon: {
     fontSize: 20,

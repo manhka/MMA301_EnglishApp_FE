@@ -11,6 +11,8 @@ import {
   Platform,
   StatusBar,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+
 import api from "../services/api";
 
 const { width } = Dimensions.get("window");
@@ -217,6 +219,7 @@ const TopicCard = ({ topic, level, skill, navigation }) => {
     if (!expanded && lessons.length === 0) {
       setLoading(true);
       try {
+        console.log(`${topic._id}- ${level} - ${skill}`);
         const res = await api.get(`/lessons/${topic._id}/${level}/${skill}`);
         setLessons(res.data.lessons || []);
       } catch (err) {
@@ -326,10 +329,10 @@ const TopicCard = ({ topic, level, skill, navigation }) => {
   );
 };
 
-export default function LessonScreen({ navigation }) {
+export default function LessonScreen({ route, navigation }) {
   const [topics, setTopics] = useState([]);
-  const level = "Beginner";
-  const skill = "reading";
+  const { level } = route.params;
+  const { skill } = route.params;
 
   useEffect(() => {
     const fetchTopics = async () => {
@@ -359,7 +362,7 @@ export default function LessonScreen({ navigation }) {
             onPress={handleBack}
             activeOpacity={0.7}
           >
-            <Text style={styles.backIcon}>←</Text>
+            <Ionicons name="arrow-back" size={24} color="#1e293b" />
           </TouchableOpacity>
 
           <View style={styles.headerContent}>
@@ -402,7 +405,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0FDF4",
   },
   header: {
-    paddingTop: Platform.OS === "ios" ? 80 : 60,
+    paddingTop: Platform.OS === "ios" ? 80 : 10,
     paddingBottom: 24,
     paddingHorizontal: 20,
     backgroundColor: "#ffffff",
@@ -417,21 +420,12 @@ const styles = StyleSheet.create({
   },
   // Back Button Styles
   backButton: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 85 : 65,
-    left: 20,
-    zIndex: 10,
     width: 40,
     height: 40,
-    backgroundColor: "rgba(0, 0, 0, 0.1)",
     borderRadius: 20,
+    backgroundColor: "#f1f5f9",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   backIcon: {
     fontSize: 20,

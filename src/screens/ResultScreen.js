@@ -6,14 +6,15 @@ import {
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import api from "../services/api";
-import { useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 
 export default function ResultScreen() {
   const route = useRoute();
   const { resultId } = route.params;
-
+  const navigation = useNavigation();
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -130,6 +131,18 @@ export default function ResultScreen() {
             </View>
           );
         })}
+        {/* Action Buttons */}
+        <View style={styles.actionContainer}>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => navigation.navigate("Dashboard")}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.secondaryButtonText}>🏠 Back to Home</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -218,5 +231,31 @@ const styles = StyleSheet.create({
     backgroundColor: "#fef3c7",
     padding: 10,
     borderRadius: 8,
+  },
+  actionContainer: {
+    marginTop: 20,
+    gap: 12,
+  },
+  secondaryButton: {
+    backgroundColor: "#ffffff",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#e2e8f0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  secondaryButtonText: {
+    color: "#64748b",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  bottomSpacer: {
+    height: 40,
   },
 });

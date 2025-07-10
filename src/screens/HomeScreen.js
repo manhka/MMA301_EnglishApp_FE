@@ -8,6 +8,7 @@ import {
   Animated,
   Alert,
 } from "react-native";
+import * as SecureStore from "expo-secure-store";
 
 const motivationalQuotes = [
   "Every expert was once a beginner. Start your IELTS journey today! 🌟",
@@ -74,8 +75,13 @@ export default function HomeScreen({ navigation, route }) {
         duration: 100,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      navigation.replace("Dashboard", { level: selectedLevel, userName });
+    ]).start(async () => {
+      try {
+        navigation.replace("Dashboard", { level: selectedLevel, userName });
+      } catch (err) {
+        console.error("Failed to store level or navigate", err);
+        Alert.alert("Error", "Something went wrong while starting.");
+      }
     });
   };
 
@@ -113,9 +119,9 @@ export default function HomeScreen({ navigation, route }) {
             <TouchableOpacity
               style={[
                 styles.levelButton,
-                selectedLevel === "beginner" && styles.levelButtonSelected,
+                selectedLevel === "Beginner" && styles.levelButtonSelected,
               ]}
-              onPress={() => setSelectedLevel("beginner")}
+              onPress={() => setSelectedLevel("Beginner")}
             >
               <Text style={styles.levelIcon}>🌱</Text>
               <Text style={styles.levelText}>Beginner</Text>
@@ -123,9 +129,9 @@ export default function HomeScreen({ navigation, route }) {
             <TouchableOpacity
               style={[
                 styles.levelButton,
-                selectedLevel === "intermediate" && styles.levelButtonSelected,
+                selectedLevel === "Intermediate" && styles.levelButtonSelected,
               ]}
-              onPress={() => setSelectedLevel("intermediate")}
+              onPress={() => setSelectedLevel("Intermediate")}
             >
               <Text style={styles.levelIcon}>🚀</Text>
               <Text style={styles.levelText}>Intermediate</Text>
@@ -133,9 +139,9 @@ export default function HomeScreen({ navigation, route }) {
             <TouchableOpacity
               style={[
                 styles.levelButton,
-                selectedLevel === "advanced" && styles.levelButtonSelected,
+                selectedLevel === "Advanced" && styles.levelButtonSelected,
               ]}
-              onPress={() => setSelectedLevel("advanced")}
+              onPress={() => setSelectedLevel("Advanced")}
             >
               <Text style={styles.levelIcon}>🏆</Text>
               <Text style={styles.levelText}>Advanced</Text>
