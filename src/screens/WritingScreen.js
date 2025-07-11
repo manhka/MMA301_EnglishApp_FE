@@ -1,36 +1,36 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  Alert,
+  TextInput,
   ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
   Platform,
-  Dimensions,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Dimensions,
+  StatusBar,
 } from "react-native";
 import api from "../services/api";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import { Ionicons } from "@expo/vector-icons"; // Make sure you have expo/vector-icons installed
 
-export default function ReadingScreen() {
-  const route = useRoute();
+const { width, height } = Dimensions.get("window");
+
+export default function WritingScreen({ route, navigation }) {
   const { lessonId } = route.params;
-  const navigation = useNavigation();
+  const userId = "664abc1234567890abcdef01";
   const [lesson, setLesson] = useState(null);
-  const [answers, setAnswers] = useState({});
+  const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
-  const userId = "664abc1234567890abcdef01"; // TODO: replace with actual user ID
+  const [wordCount, setWordCount] = useState(0);
 
   useEffect(() => {
     const fetchLesson = async () => {
       try {
-        const res = await api.get(`/lesson/${lessonId}/reading`);
+        const res = await api.get(`/lesson/${lessonId}/writing`);
         setLesson(res.data);
         setTimeLeft(res.data.duration * 60);
       } catch (err) {
@@ -51,20 +51,13 @@ export default function ReadingScreen() {
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  const handleSelect = (qId, index, type) => {
-    const key = String(qId);
-    setAnswers((prev) => {
-      if (type === "multiple-choice") {
-        const current = prev[key] || [];
-        const updated = current.includes(index)
-          ? current.filter((i) => i !== index)
-          : [...current, index];
-        return { ...prev, [key]: updated };
-      } else {
-        return { ...prev, [key]: index };
-      }
-    });
-  };
+  useEffect(() => {
+    const words = answer
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0);
+    setWordCount(words.length);
+  }, [answer]);
 
   const formatTime = (seconds) => {
     const min = Math.floor(seconds / 60);
@@ -72,743 +65,427 @@ export default function ReadingScreen() {
     return `${min}:${sec < 10 ? "0" : ""}${sec}`;
   };
 
-  const getAnswerStats = () => {
-    if (!lesson?.questions) return { answered: 0, total: 0, unanswered: 0 };
-
-    const total = lesson.questions.length;
-    let answered = 0;
-
-    lesson.questions.forEach((question) => {
-      const qId = String(question._id);
-      const userAnswer = answers[qId];
-
-      if (question.type === "multiple-choice") {
-        // For multiple choice, check if array exists and has at least one selection
-        if (Array.isArray(userAnswer) && userAnswer.length > 0) {
-          answered++;
-        }
-      } else {
-        // For single choice, check if answer is not null/undefined
-        if (userAnswer !== null && userAnswer !== undefined) {
-          answered++;
-        }
-      }
-    });
-
-    return {
-      answered,
-      total,
-      unanswered: total - answered,
-    };
+  const getTimeColor = () => {
+    if (timeLeft > 300) return "#10b981"; // Green
+    if (timeLeft > 60) return "#f59e0b"; // Yellow
+    return "#ef4444"; // Red
   };
 
   const handleBack = () => {
+    if (answer.trim()) {
+      Alert.alert(
+        "⚠️ Unsaved Changes",
+        "You have unsaved writing. Are you sure you want to go back? Your progress will be lost.",
+        [
+          {
+            text: "Stay Here",
+            style: "cancel",
+          },
+          {
+            text: "Go Back",
+            style: "destructive",
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!answer.trim()) {
+      Alert.alert(
+        "✍️ Empty Answer",
+        "Please write your answer before submitting."
+      );
+      return;
+    }
+
     Alert.alert(
-      "Leave Reading Test",
-      "Are you sure you want to leave? Your progress will be lost.",
+      "📤 Submit Writing",
+      `Are you sure you want to submit your writing?\n\nWord count: ${wordCount} words\nTime remaining: ${formatTime(
+        timeLeft
+      )}`,
       [
         {
-          text: "Stay",
+          text: "Cancel",
           style: "cancel",
         },
         {
-          text: "Leave",
-          style: "destructive",
-          onPress: () => navigation.goBack(),
+          text: "Submit",
+          style: "default",
+          onPress: performSubmit,
         },
       ]
     );
   };
 
-  const handleSubmit = () => {
-    Alert.alert("Submit Answers", "Are you sure you want to submit?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Submit",
-        onPress: async () => {
-          setSubmitting(true);
-          try {
-            const res = await api.post("/result/submit", {
-              userId,
-              lessonId,
-              skill: "reading",
-              answers,
-            });
-            setTimeout(() => {
-              setSubmitting(false);
-              navigation.navigate("Result", { resultId: res.data.resultId });
-            }, 1500);
-          } catch (err) {
-            setSubmitting(false);
-            console.error("Submit failed", err);
-            Alert.alert("Error", "Could not submit your answers.");
-          }
-        },
-      },
-    ]);
+  const performSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const res = await api.post("/submit/writing", {
+        userId,
+        lessonId,
+        question: lesson.content,
+        text: answer,
+      });
+      const { aiScore, aiFeedback } = res.data;
+      navigation.navigate("Result2", {
+        prompt: lesson.content,
+        aiScore,
+        aiFeedback,
+        submittedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error("Submit failed", err);
+      Alert.alert("Error", "Could not submit or evaluate your writing.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading || submitting) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
-        <View style={styles.loadingContent}>
-          <ActivityIndicator size="large" color="#2563eb" />
+      <View style={styles.loadingContainer}>
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="large" color="#6366f1" />
           <Text style={styles.loadingText}>
-            {loading ? "Loading lesson..." : "Submitting your answers..."}
+            {loading ? "Loading lesson..." : "Submitting your work..."}
           </Text>
           {submitting && (
-            <Text style={styles.loadingSubText}>
-              Please wait while we process your submission
+            <Text style={styles.loadingSubtext}>
+              AI is evaluating your writing
             </Text>
           )}
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
-
-      {/* Enhanced Header with Back Button and Title */}
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={handleBack}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
 
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>Reading Test</Text>
-          <Text style={styles.subtitle}>
-            {lesson?.title || `Lesson ${lessonId}`}
-          </Text>
-        </View>
-
-        <View style={styles.timerContainer}>
-          <View style={styles.timerBox}>
-            <Ionicons name="time-outline" size={16} color="#dc2626" />
-            <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Reading Passage */}
-      <View style={styles.passageSection}>
-        <View style={styles.passageTitleBar}>
-          <Text style={styles.passageTitle}>Reading Passage</Text>
-          <View style={styles.passageBadge}>
-            <Text style={styles.passageBadgeText}>Read Carefully</Text>
-          </View>
-        </View>
-        <View style={styles.passageContainer}>
-          <ScrollView
-            style={styles.passageScroll}
-            nestedScrollEnabled
-            showsVerticalScrollIndicator={true}
-            indicatorStyle="default"
-          >
-            <Text style={styles.passage}>{lesson.content}</Text>
-          </ScrollView>
-        </View>
-      </View>
-
-      {/* Questions Section */}
-      <ScrollView
-        style={styles.scrollArea}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
-      >
-        <View style={styles.questionsHeader}>
-          <Text style={styles.questionsTitle}>Questions</Text>
-          <Text style={styles.questionsCount}>
-            {lesson?.questions?.length || 0} questions
-          </Text>
-        </View>
-
-        {Array.isArray(lesson?.questions) && lesson.questions.length > 0 ? (
-          lesson.questions.map((item, index) => {
-            const qId = String(item._id);
-            const isMultiple = item.type === "multiple-choice";
-            const userAnswer = Object.prototype.hasOwnProperty.call(
-              answers,
-              qId
-            )
-              ? answers[qId]
-              : isMultiple
-              ? []
-              : null;
-
-            return (
-              <View key={qId} style={styles.questionBlock}>
-                <View style={styles.questionHeader}>
-                  <View style={styles.questionNumberContainer}>
-                    <Text style={styles.questionNumber}>{index + 1}</Text>
-                  </View>
-                  <Text style={styles.questionType}>
-                    {isMultiple ? "Multiple Choice" : "Single Choice"}
-                  </Text>
-                </View>
-
-                <Text style={styles.questionText}>{item.questionText}</Text>
-
-                <View style={styles.optionsContainer}>
-                  {Array.isArray(item.choices) &&
-                    item.choices.map((choice, i) => {
-                      const selected = isMultiple
-                        ? userAnswer.includes(i)
-                        : userAnswer === i;
-
-                      return (
-                        <TouchableOpacity
-                          key={i}
-                          style={[
-                            styles.option,
-                            selected && styles.optionSelected,
-                          ]}
-                          onPress={() => handleSelect(qId, i, item.type)}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.optionContent}>
-                            <View
-                              style={[
-                                styles.optionIndicator,
-                                selected && styles.optionIndicatorSelected,
-                              ]}
-                            >
-                              <Text style={styles.optionLetter}>
-                                {String.fromCharCode(65 + i)}
-                              </Text>
-                            </View>
-                            <Text
-                              style={[
-                                styles.optionText,
-                                selected && styles.optionTextSelected,
-                              ]}
-                            >
-                              {choice}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                </View>
-              </View>
-            );
-          })
-        ) : (
-          <View style={styles.noQuestionsContainer}>
-            <Ionicons name="document-text-outline" size={48} color="#9ca3af" />
-            <Text style={styles.noQuestionsText}>
-              No questions available for this lesson.
-            </Text>
-          </View>
-        )}
-
-        {(() => {
-          const answerStats = getAnswerStats();
-          const allAnswered = answerStats.unanswered === 0;
-
-          return (
-            <View style={styles.submitSection}>
-              <View style={styles.answerStatsContainer}>
-                <View style={styles.statItem}>
-                  <View
-                    style={[
-                      styles.statIndicator,
-                      { backgroundColor: "#10b981" },
-                    ]}
-                  >
-                    <Ionicons name="checkmark" size={16} color="#fff" />
-                  </View>
-                  <Text style={styles.statText}>
-                    {answerStats.answered} answered
-                  </Text>
-                </View>
-
-                <View style={styles.statItem}>
-                  <View
-                    style={[
-                      styles.statIndicator,
-                      { backgroundColor: "#f59e0b" },
-                    ]}
-                  >
-                    <Ionicons name="help" size={16} color="#fff" />
-                  </View>
-                  <Text style={styles.statText}>
-                    {answerStats.unanswered} remaining
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.submitBtn,
-                  !allAnswered && styles.submitBtnIncomplete,
-                ]}
-                onPress={handleSubmit}
-              >
-                <View style={styles.submitContent}>
-                  <Ionicons
-                    name={allAnswered ? "checkmark-circle" : "warning"}
-                    size={20}
-                    color="#fff"
-                  />
-                  <View style={styles.submitTextContainer}>
-                    <Text style={styles.submitText}>
-                      {allAnswered ? "Submit All Answers" : "Submit Answers"}
-                    </Text>
-                    <Text style={styles.submitSubText}>
-                      {answerStats.answered}/{answerStats.total} questions
-                      completed
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              {!allAnswered && (
-                <View style={styles.warningContainer}>
-                  <Ionicons
-                    name="information-circle"
-                    size={16}
-                    color="#f59e0b"
-                  />
-                  <Text style={styles.warningText}>
-                    You have {answerStats.unanswered} unanswered question
-                    {answerStats.unanswered !== 1 ? "s" : ""}. You can still
-                    submit, but consider reviewing them first.
-                  </Text>
-                </View>
-              )}
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>✍️ Writing Practice</Text>
+          <Text style={styles.subtitle}>{lesson.title}</Text>
+          <View style={styles.statsRow}>
+            <View
+              style={[styles.statCard, { borderLeftColor: getTimeColor() }]}
+            >
+              <Text style={[styles.statValue, { color: getTimeColor() }]}>
+                {formatTime(timeLeft)}
+              </Text>
+              <Text style={styles.statLabel}>Time Left</Text>
             </View>
-          );
-        })()}
-      </ScrollView>
-    </SafeAreaView>
+            <View style={[styles.statCard, { borderLeftColor: "#10b981" }]}>
+              <Text style={[styles.statValue, { color: "#10b981" }]}>
+                {wordCount}
+              </Text>
+              <Text style={styles.statLabel}>Words</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
+        <ScrollView
+          style={styles.container}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.promptCard}>
+            <View style={styles.promptHeader}>
+              <View style={styles.promptIconContainer}>
+                <Text style={styles.promptIcon}>📝</Text>
+              </View>
+              <Text style={styles.promptTitle}>Writing Task</Text>
+            </View>
+            <Text style={styles.promptText}>{lesson.content}</Text>
+          </View>
+
+          <View style={styles.inputSection}>
+            <View style={styles.inputHeader}>
+              <Text style={styles.inputLabel}>Your Response</Text>
+              <View style={styles.wordCounterContainer}>
+                <Text style={styles.wordCounter}>{wordCount} words</Text>
+              </View>
+            </View>
+            <View style={styles.textInputContainer}>
+              <TextInput
+                style={styles.textArea}
+                placeholder="Start writing your response here..."
+                placeholderTextColor="#9ca3af"
+                multiline
+                value={answer}
+                onChangeText={setAnswer}
+                textAlignVertical="top"
+                autoFocus={false}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              !answer.trim() && styles.submitButtonDisabled,
+            ]}
+            onPress={handleSubmit}
+            disabled={!answer.trim() || submitting}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.submitButtonText}>
+              {submitting ? "Submitting..." : "📤 Submit Writing"}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </>
   );
 }
 
-const SCREEN_HEIGHT = Dimensions.get("window").height;
-const HEADER_HEIGHT = 140;
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-
-  loadingContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+  header: {
+    backgroundColor: "#ffffff", // Changed from "#6366f1" to white
+    paddingTop: Platform.OS === "ios" ? 50 : StatusBar.currentHeight + 20,
+    paddingBottom: 30,
     paddingHorizontal: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
   },
-
-  loadingText: {
-    fontSize: 18,
-    color: "#475569",
-    marginTop: 16,
+  backButton: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 55 : StatusBar.currentHeight + 25,
+    left: 20,
+    zIndex: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.1)", // Changed to dark semi-transparent
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.2)", // Changed to dark border
+  },
+  backButtonText: {
+    color: "#1e293b", // Changed from white to dark
+    fontSize: 16,
     fontWeight: "600",
   },
-
-  loadingSubText: {
-    fontSize: 14,
-    color: "#64748b",
-    marginTop: 8,
-    textAlign: "center",
-  },
-
-  // Enhanced Header Styles
-  header: {
-    flexDirection: "row",
+  headerContent: {
     alignItems: "center",
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#1e293b", // Changed from white to dark
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#64748b", // Changed from light blue to gray
+    textAlign: "center",
+    marginBottom: 20,
+    fontWeight: "500",
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+  },
+  statCard: {
+    backgroundColor: "rgba(0, 0, 0, 0.05)", // Changed to light gray
+    paddingVertical: 12,
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 16,
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    minWidth: 80,
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    borderRadius: 15,
   },
-
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#f1f5f9",
+  statValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: "#64748b", // Changed from light blue to gray
+    fontWeight: "500",
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: "#F0FDF4",
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    flexGrow: 1,
+  },
+  promptCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  promptHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  promptIconContainer: {
+    backgroundColor: "#f0f9ff",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
-
-  titleContainer: {
-    flex: 1,
+  promptIcon: {
+    fontSize: 18,
   },
-
-  title: {
-    fontSize: 20,
+  promptTitle: {
+    fontSize: 18,
     fontWeight: "700",
     color: "#1e293b",
-    marginBottom: 2,
   },
-
-  subtitle: {
-    fontSize: 14,
-    color: "#64748b",
-    fontWeight: "500",
-  },
-
-  timerContainer: {
-    alignItems: "flex-end",
-  },
-
-  timerBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fef2f2",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#fecaca",
-  },
-
-  timerText: {
+  promptText: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#dc2626",
-    marginLeft: 4,
+    color: "#475569",
+    lineHeight: 24,
+    fontWeight: "400",
   },
-
-  // Passage Section Styles
-  passageSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#F8FAFC",
+  inputSection: {
+    marginBottom: 24,
   },
-
-  passageTitleBar: {
+  inputHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
   },
-
-  passageTitle: {
+  inputLabel: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#1e293b",
-  },
-
-  passageBadge: {
-    backgroundColor: "#dbeafe",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-
-  passageBadgeText: {
-    fontSize: 12,
     fontWeight: "600",
-    color: "#1d4ed8",
-  },
-
-  passageContainer: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 20,
-    maxHeight: 180,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-
-  passageScroll: {
-    maxHeight: 140,
-  },
-
-  passage: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: "#334155",
-    textAlign: "justify",
-  },
-
-  // Questions Section Styles
-  scrollArea: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-
-  scrollContent: {
-    paddingBottom: 100,
-    paddingTop: 16,
-  },
-
-  questionsHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-
-  questionsTitle: {
-    fontSize: 20,
-    fontWeight: "700",
     color: "#1e293b",
   },
-
-  questionsCount: {
+  wordCounterContainer: {
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  wordCounter: {
     fontSize: 14,
     color: "#64748b",
-    fontWeight: "500",
+    fontWeight: "600",
   },
-
-  questionBlock: {
+  textInputContainer: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 2,
-  },
-
-  questionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-
-  questionNumberContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#2563eb",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  questionNumber: {
-    fontSize: 16,
-    color: "#ffffff",
-    fontWeight: "700",
-  },
-
-  questionType: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#6366f1",
-    backgroundColor: "#eef2ff",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-
-  questionText: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#1e293b",
-    marginBottom: 16,
-    lineHeight: 24,
-  },
-
-  optionsContainer: {
-    gap: 12,
-  },
-
-  option: {
-    borderRadius: 12,
-    backgroundColor: "#f8fafc",
+    elevation: 4,
     borderWidth: 2,
     borderColor: "#e2e8f0",
-    overflow: "hidden",
   },
-
-  optionSelected: {
-    backgroundColor: "#eff6ff",
-    borderColor: "#2563eb",
-  },
-
-  optionContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-  },
-
-  optionIndicator: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#e2e8f0",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-
-  optionIndicatorSelected: {
-    backgroundColor: "#2563eb",
-  },
-
-  optionLetter: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#64748b",
-  },
-
-  optionText: {
+  textArea: {
+    minHeight: 200,
+    padding: 20,
     fontSize: 16,
-    color: "#334155",
-    flex: 1,
-    lineHeight: 22,
-  },
-
-  optionTextSelected: {
-    fontWeight: "600",
+    lineHeight: 24,
     color: "#1e293b",
+    fontWeight: "400",
   },
-
-  noQuestionsContainer: {
-    alignItems: "center",
-    paddingVertical: 40,
-  },
-
-  noQuestionsText: {
-    textAlign: "center",
-    color: "#6b7280",
-    marginTop: 16,
-    fontSize: 16,
-  },
-
-  submitSection: {
-    marginTop: 30,
-    marginBottom: 20,
-  },
-
-  answerStatsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-
-  statItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-  },
-
-  statIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 8,
-  },
-
-  statText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-  },
-
-  submitContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  submitTextContainer: {
-    marginLeft: 8,
-    alignItems: "center",
-  },
-
-  submitSubText: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 12,
-    fontWeight: "500",
-    marginTop: 2,
-  },
-
-  submitBtn: {
-    backgroundColor: "#2563eb",
-    paddingVertical: 18,
+  submitButton: {
+    backgroundColor: "#10b981",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
     borderRadius: 16,
     alignItems: "center",
-    marginTop: 0,
-    marginBottom: 0,
-    flexDirection: "row",
-    justifyContent: "center",
-    shadowColor: "#2563eb",
-    shadowOffset: { width: 0, height: 8 },
+    shadowColor: "#10b981",
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowRadius: 8,
+    elevation: 6,
   },
-
-  submitText: {
-    color: "#fff",
+  submitButtonDisabled: {
+    backgroundColor: "#9ca3af",
+    shadowColor: "#9ca3af",
+    shadowOpacity: 0.1,
+  },
+  submitButtonText: {
+    color: "#ffffff",
     fontSize: 18,
     fontWeight: "700",
-    marginLeft: 8,
   },
-
-  submitBtnIncomplete: {
-    backgroundColor: "#f59e0b",
+  bottomSpacer: {
+    height: 40,
   },
-
-  warningContainer: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "#fffbeb",
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "#fed7aa",
-  },
-
-  warningText: {
-    fontSize: 13,
-    color: "#92400e",
-    marginLeft: 8,
+  loadingContainer: {
     flex: 1,
-    lineHeight: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+  },
+  loadingCard: {
+    backgroundColor: "#ffffff",
+    padding: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+    marginHorizontal: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#1e293b",
+    textAlign: "center",
+  },
+  loadingSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#64748b",
+    textAlign: "center",
   },
 });
