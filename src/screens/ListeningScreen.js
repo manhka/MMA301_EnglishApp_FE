@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -8,7 +10,6 @@ import {
   StatusBar,
   Alert,
   ScrollView,
-  Platform,
   Dimensions,
   ActivityIndicator,
   Animated,
@@ -18,10 +19,13 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../services/api";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { BASE_URL } from "../constants/constants";
+import * as SecureStore from "expo-secure-store";
+
 export default function ListeningScreen() {
   const route = useRoute();
   const { lessonId } = route.params;
   const navigation = useNavigation();
+
   const [lesson, setLesson] = useState(null);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
@@ -34,7 +38,24 @@ export default function ListeningScreen() {
   const [startTime, setStartTime] = useState(null);
   const [endTime, setEndTime] = useState(null);
   const [pulseAnim] = useState(new Animated.Value(1));
-  const userId = "664abc1234567890abcdef01";
+  const [userId, setUserId] = useState(null);
+
+  useEffect(() => {
+    const fetchUserId = async () => {
+      try {
+        const id = await SecureStore.getItemAsync("userId");
+        if (id) {
+          setUserId(id);
+        } else {
+          Alert.alert("Error", "User not found. Please login again.");
+          navigation.navigate("Login");
+        }
+      } catch (err) {
+        console.error("Failed to get userId", err);
+      }
+    };
+    fetchUserId();
+  }, []);
 
   useEffect(() => {
     const fetchLesson = async () => {
@@ -59,11 +80,18 @@ export default function ListeningScreen() {
 
   useEffect(() => {
     if (!timeLeft) return;
+
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
+
+    // Automatically submit when time runs out
+    if (timeLeft === 0 && !submitting && lesson) {
+      handleSubmit(true); // Pass true to indicate auto-submission
+    }
+
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, submitting, lesson]); // Add submitting and lesson to dependencies
 
   // Pulse animation for playing audio
   useEffect(() => {
@@ -106,7 +134,6 @@ export default function ListeningScreen() {
   const handlePlayAudio = async () => {
     try {
       const audioUrl = `${BASE_URL}/uploads/audio1.mp3`;
-
       if (sound) {
         if (isPlaying) {
           await sound.pauseAsync();
@@ -117,15 +144,12 @@ export default function ListeningScreen() {
         }
         return;
       }
-
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
         { shouldPlay: true }
       );
-
       setSound(newSound);
       setIsPlaying(true);
-
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded) {
           setPlaybackPosition(status.positionMillis || 0);
@@ -156,14 +180,11 @@ export default function ListeningScreen() {
 
   const getAnswerStats = () => {
     if (!lesson?.questions) return { answered: 0, total: 0, unanswered: 0 };
-
     const total = lesson.questions.length;
     let answered = 0;
-
     lesson.questions.forEach((question) => {
       const qId = String(question._id);
       const userAnswer = answers[qId];
-
       if (question.type === "multiple-choice") {
         if (Array.isArray(userAnswer) && userAnswer.length > 0) {
           answered++;
@@ -174,7 +195,6 @@ export default function ListeningScreen() {
         }
       }
     });
-
     return {
       answered,
       total,
@@ -202,41 +222,47 @@ export default function ListeningScreen() {
     );
   };
 
-  const handleSubmit = () => {
-    const stats = getAnswerStats();
-    const message =
-      stats.unanswered > 0
-        ? `You have ${stats.unanswered} unanswered questions. Are you sure you want to submit?`
-        : "Are you sure you want to submit your answers?";
+  const handleSubmit = async (autoSubmit = false) => {
+    // Added autoSubmit parameter
+    const submitAction = async () => {
+      setSubmitting(true);
+      try {
+        if (sound) {
+          await sound.unloadAsync();
+        }
+        const res = await api.post("/result/submit", {
+          userId,
+          lessonId,
+          skill: "listening",
+          answers,
+        });
+        setTimeout(() => {
+          setSubmitting(false);
+          navigation.navigate("Result", { resultId: res.data.resultId });
+        }, 1500);
+      } catch (err) {
+        setSubmitting(false);
+        console.error("Submit failed", err);
+        Alert.alert("Error", "Could not submit your answers.");
+      }
+    };
 
-    Alert.alert("Submit Answers", message, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Submit",
-        onPress: async () => {
-          setSubmitting(true);
-          try {
-            if (sound) {
-              await sound.unloadAsync();
-            }
-            const res = await api.post("/result/submit", {
-              userId,
-              lessonId,
-              skill: "listening",
-              answers,
-            });
-            setTimeout(() => {
-              setSubmitting(false);
-              navigation.navigate("Result", { resultId: res.data.resultId });
-            }, 1500);
-          } catch (err) {
-            setSubmitting(false);
-            console.error("Submit failed", err);
-            Alert.alert("Error", "Could not submit your answers.");
-          }
+    if (autoSubmit) {
+      submitAction(); // Directly submit if autoSubmit is true
+    } else {
+      const stats = getAnswerStats();
+      const message =
+        stats.unanswered > 0
+          ? `You have ${stats.unanswered} unanswered questions. Are you sure you want to submit?`
+          : "Are you sure you want to submit your answers?";
+      Alert.alert("Submit Answers", message, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Submit",
+          onPress: submitAction, // Use the common submit action
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   if (loading || submitting) {
@@ -261,7 +287,6 @@ export default function ListeningScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
-
       {/* Enhanced Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -271,14 +296,12 @@ export default function ListeningScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>
-
         <View style={styles.titleContainer}>
           <Text style={styles.title}>Listening Test</Text>
           <Text style={styles.subtitle}>
             {lesson?.title || `Lesson ${lessonId}`}
           </Text>
         </View>
-
         <View style={styles.timerContainer}>
           <View style={styles.timerBox}>
             <Ionicons name="time-outline" size={16} color="#dc2626" />
@@ -286,7 +309,6 @@ export default function ListeningScreen() {
           </View>
         </View>
       </View>
-
       {/* Audio Player Section */}
       <View style={styles.audioSection}>
         <View style={styles.audioHeader}>
@@ -295,7 +317,6 @@ export default function ListeningScreen() {
           </View>
           <Text style={styles.audioTitle}>Audio Player</Text>
         </View>
-
         <View style={styles.audioPlayerContainer}>
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
             <TouchableOpacity
@@ -310,7 +331,6 @@ export default function ListeningScreen() {
               />
             </TouchableOpacity>
           </Animated.View>
-
           <View style={styles.audioInfo}>
             <Text style={styles.audioStatus}>
               {isPlaying ? "Playing..." : "Ready to play"}
@@ -337,7 +357,6 @@ export default function ListeningScreen() {
             )}
           </View>
         </View>
-
         <View style={styles.sessionInfo}>
           <View style={styles.sessionItem}>
             <Ionicons name="play-circle-outline" size={16} color="#059669" />
@@ -353,7 +372,6 @@ export default function ListeningScreen() {
           </View>
         </View>
       </View>
-
       {/* Questions Section */}
       <ScrollView
         style={styles.scrollArea}
@@ -366,7 +384,6 @@ export default function ListeningScreen() {
             {lesson?.questions?.length || 0} questions
           </Text>
         </View>
-
         {lesson?.questions?.map((item, index) => {
           const qId = String(item._id);
           const isMultiple = item.type === "multiple-choice";
@@ -375,7 +392,6 @@ export default function ListeningScreen() {
             : isMultiple
             ? []
             : null;
-
           return (
             <View key={qId} style={styles.questionBlock}>
               <View style={styles.questionHeader}>
@@ -386,15 +402,12 @@ export default function ListeningScreen() {
                   {isMultiple ? "Multiple Choice" : "Single Choice"}
                 </Text>
               </View>
-
               <Text style={styles.questionText}>{item.questionText}</Text>
-
               <View style={styles.optionsContainer}>
                 {item.choices?.map((choice, i) => {
                   const selected = isMultiple
                     ? userAnswer.includes(i)
                     : userAnswer === i;
-
                   return (
                     <TouchableOpacity
                       key={i}
@@ -429,11 +442,9 @@ export default function ListeningScreen() {
             </View>
           );
         })}
-
         {(() => {
           const answerStats = getAnswerStats();
           const allAnswered = answerStats.unanswered === 0;
-
           return (
             <View style={styles.submitSection}>
               <View style={styles.answerStatsContainer}>
@@ -450,7 +461,6 @@ export default function ListeningScreen() {
                     {answerStats.answered} answered
                   </Text>
                 </View>
-
                 <View style={styles.statItem}>
                   <View
                     style={[
@@ -465,13 +475,12 @@ export default function ListeningScreen() {
                   </Text>
                 </View>
               </View>
-
               <TouchableOpacity
                 style={[
                   styles.submitBtn,
                   !allAnswered && styles.submitBtnIncomplete,
                 ]}
-                onPress={handleSubmit}
+                onPress={() => handleSubmit(false)} // Explicitly pass false for manual submission
               >
                 <View style={styles.submitContent}>
                   <Ionicons
@@ -490,7 +499,6 @@ export default function ListeningScreen() {
                   </View>
                 </View>
               </TouchableOpacity>
-
               {!allAnswered && (
                 <View style={styles.warningContainer}>
                   <Ionicons
@@ -514,39 +522,33 @@ export default function ListeningScreen() {
 }
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F0FDF4",
   },
-
   loadingContainer: {
     flex: 1,
     backgroundColor: "#F0FDF4",
   },
-
   loadingContent: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
   },
-
   loadingText: {
     fontSize: 18,
     color: "#475569",
     marginTop: 16,
     fontWeight: "600",
   },
-
   loadingSubText: {
     fontSize: 14,
     color: "#64748b",
     marginTop: 8,
     textAlign: "center",
   },
-
   // Enhanced Header Styles
   header: {
     flexDirection: "row",
@@ -564,7 +566,6 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderRadius: 15,
   },
-
   backButton: {
     width: 40,
     height: 40,
@@ -574,28 +575,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 12,
   },
-
   titleContainer: {
     flex: 1,
   },
-
   title: {
     fontSize: 20,
     fontWeight: "700",
     color: "#1e293b",
     marginBottom: 2,
   },
-
   subtitle: {
     fontSize: 14,
     color: "#64748b",
     fontWeight: "500",
   },
-
   timerContainer: {
     alignItems: "flex-end",
   },
-
   timerBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -606,27 +602,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#fecaca",
   },
-
   timerText: {
     fontSize: 16,
     fontWeight: "700",
     color: "#dc2626",
     marginLeft: 4,
   },
-
   // Audio Section Styles
   audioSection: {
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: "#F0FDF4",
   },
-
   audioHeader: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 16,
   },
-
   audioIconContainer: {
     width: 32,
     height: 32,
@@ -636,13 +628,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 12,
   },
-
   audioTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: "#1e293b",
   },
-
   audioPlayerContainer: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
@@ -658,7 +648,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-
   playButton: {
     width: 64,
     height: 64,
@@ -673,45 +662,37 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-
   playButtonActive: {
     backgroundColor: "#059669",
   },
-
   audioInfo: {
     flex: 1,
   },
-
   audioStatus: {
     fontSize: 16,
     fontWeight: "600",
     color: "#1e293b",
     marginBottom: 8,
   },
-
   progressContainer: {
     marginTop: 8,
   },
-
   progressBar: {
     height: 4,
     backgroundColor: "#e2e8f0",
     borderRadius: 2,
     marginBottom: 8,
   },
-
   progressFill: {
     height: "100%",
     backgroundColor: "#10b981",
     borderRadius: 2,
   },
-
   timeDisplay: {
     fontSize: 12,
     color: "#64748b",
     fontWeight: "500",
   },
-
   sessionInfo: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
@@ -719,50 +700,42 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-
   sessionItem: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 8,
   },
-
   sessionText: {
     fontSize: 14,
     color: "#64748b",
     marginLeft: 8,
     fontWeight: "500",
   },
-
   // Questions Section Styles
   scrollArea: {
     flex: 1,
     paddingHorizontal: 20,
   },
-
   scrollContent: {
     paddingBottom: 100,
     paddingTop: 16,
   },
-
   questionsHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
   },
-
   questionsTitle: {
     fontSize: 20,
     fontWeight: "700",
     color: "#1e293b",
   },
-
   questionsCount: {
     fontSize: 14,
     color: "#64748b",
     fontWeight: "500",
   },
-
   questionBlock: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
@@ -776,14 +749,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-
   questionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
   },
-
   questionNumberContainer: {
     width: 32,
     height: 32,
@@ -792,13 +763,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   questionNumber: {
     fontSize: 16,
     color: "#ffffff",
     fontWeight: "700",
   },
-
   questionType: {
     fontSize: 12,
     fontWeight: "600",
@@ -808,7 +777,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-
   questionText: {
     fontSize: 17,
     fontWeight: "600",
@@ -816,11 +784,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 24,
   },
-
   optionsContainer: {
     gap: 12,
   },
-
   option: {
     borderRadius: 12,
     backgroundColor: "#f8fafc",
@@ -828,18 +794,15 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
     overflow: "hidden",
   },
-
   optionSelected: {
     backgroundColor: "#ecfdf5",
     borderColor: "#10b981",
   },
-
   optionContent: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
   },
-
   optionIndicator: {
     width: 28,
     height: 28,
@@ -849,35 +812,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 12,
   },
-
   optionIndicatorSelected: {
     backgroundColor: "#10b981",
   },
-
   optionLetter: {
     fontSize: 14,
     fontWeight: "700",
     color: "#64748b",
   },
-
   optionText: {
     fontSize: 16,
     color: "#334155",
     flex: 1,
     lineHeight: 22,
   },
-
   optionTextSelected: {
     fontWeight: "600",
     color: "#1e293b",
   },
-
   // Submit Section Styles
   submitSection: {
     marginTop: 30,
     marginBottom: 20,
   },
-
   answerStatsContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -893,14 +850,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-
   statItem: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
     justifyContent: "center",
   },
-
   statIndicator: {
     width: 24,
     height: 24,
@@ -909,31 +864,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 8,
   },
-
   statText: {
     fontSize: 14,
     fontWeight: "600",
     color: "#374151",
   },
-
   submitContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
   },
-
   submitTextContainer: {
     marginLeft: 8,
     alignItems: "center",
   },
-
   submitSubText: {
     color: "rgba(255, 255, 255, 0.8)",
     fontSize: 12,
     fontWeight: "500",
     marginTop: 2,
   },
-
   submitBtn: {
     backgroundColor: "#10b981",
     paddingVertical: 18,
@@ -949,18 +899,15 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
-
   submitText: {
     color: "#fff",
     fontSize: 18,
     fontWeight: "700",
     marginLeft: 8,
   },
-
   submitBtnIncomplete: {
     backgroundColor: "#f59e0b",
   },
-
   warningContainer: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -971,7 +918,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#fed7aa",
   },
-
   warningText: {
     fontSize: 13,
     color: "#92400e",

@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,12 +10,63 @@ import {
   StatusBar,
   Platform,
   Dimensions,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
 } from "react-native";
-
-const { width } = Dimensions.get("window");
+import { Ionicons } from "@expo/vector-icons";
+import api from "../services/api"; // Import the api service
 
 export default function Result2Screen({ route, navigation }) {
-  const { prompt, aiScore, aiFeedback, submittedAt } = route.params;
+  // Get writingSubmissionId from route.params
+  const { writingSubmissionId, isFromReview } = route.params;
+
+  const [submissionDetails, setSubmissionDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchSubmissionDetails = async () => {
+      if (!writingSubmissionId) {
+        setError("Writing submission ID not found for details.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        // Call API using writingSubmissionId
+        const response = await api.get(
+          `/writing-submit/${writingSubmissionId}`
+        );
+        setSubmissionDetails(response.data); // Axios returns data in .data property
+      } catch (err) {
+        console.error("Error loading writing submission details:", err);
+        setError(
+          "Could not load writing submission details. Please try again."
+        );
+        Alert.alert(
+          "Error",
+          "Could not load writing submission details. Please check your connection and try again.",
+          [
+            {
+              text: "Retry",
+              onPress: () => fetchSubmissionDetails(),
+            },
+            {
+              text: "Cancel",
+              style: "cancel",
+            },
+          ]
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubmissionDetails();
+  }, [writingSubmissionId]); // Dependency array to re-fetch when writingSubmissionId changes
 
   const getScoreColor = (score) => {
     if (score >= 80) return "#10b981"; // Green
@@ -32,6 +85,7 @@ export default function Result2Screen({ route, navigation }) {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
       year: "numeric",
@@ -42,10 +96,71 @@ export default function Result2Screen({ route, navigation }) {
     });
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
+        <ActivityIndicator size="large" color="#10b981" />
+        <Text style={styles.loadingText}>
+          Loading writing submission details...
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.errorContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
+        <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.retryButton}
+        >
+          <Text style={styles.retryButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  if (!submissionDetails) {
+    return (
+      <SafeAreaView style={styles.emptyContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
+        <Ionicons name="information-circle-outline" size={48} color="#64748b" />
+        <Text style={styles.emptyText}>No data found for this submission.</Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.retryButton}
+        >
+          <Text style={styles.retryButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+  const handleBack = () => {
+    if (isFromReview) {
+      navigation.goBack();
+    } else {
+      navigation.navigate("Dashboard");
+    }
+  };
+  // Use data from submissionDetails
+  const { content, aiScore, aiFeedback, submittedAt, submissionText } =
+    submissionDetails;
+
   return (
     <>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={handleBack}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color="#1e293b" />
+        </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>🎓 AI Evaluation Result</Text>
           <Text style={styles.headerSubtitle}>
@@ -53,7 +168,6 @@ export default function Result2Screen({ route, navigation }) {
           </Text>
         </View>
       </View>
-
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
@@ -99,6 +213,19 @@ export default function Result2Screen({ route, navigation }) {
           )}
         </View>
 
+        {/* Submitted Text Card (New) */}
+        {submissionText && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.iconContainer}>
+                <Text style={styles.cardIcon}>✍️</Text>
+              </View>
+              <Text style={styles.cardTitle}>Your Submission</Text>
+            </View>
+            <Text style={styles.cardContent}>{submissionText}</Text>
+          </View>
+        )}
+
         {/* Prompt Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -107,7 +234,7 @@ export default function Result2Screen({ route, navigation }) {
             </View>
             <Text style={styles.cardTitle}>Writing Prompt</Text>
           </View>
-          <Text style={styles.cardContent}>{prompt}</Text>
+          <Text style={styles.cardContent}>{content}</Text>
         </View>
 
         {/* Feedback Card */}
@@ -149,7 +276,6 @@ export default function Result2Screen({ route, navigation }) {
             <Text style={styles.secondaryButtonText}>🏠 Back to Home</Text>
           </TouchableOpacity>
         </View>
-
         <View style={styles.bottomSpacer} />
       </ScrollView>
     </>
@@ -158,8 +284,8 @@ export default function Result2Screen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: "#ffffff", // Changed from "#6366f1" to white
-    paddingTop: Platform.OS === "ios" ? 50 : StatusBar.currentHeight + 20,
+    backgroundColor: "#ffffff",
+    paddingTop: Platform.OS === "ios" ? 50 : StatusBar.currentHeight,
     paddingBottom: 30,
     paddingHorizontal: 20,
     shadowColor: "#000",
@@ -173,15 +299,9 @@ const styles = StyleSheet.create({
     top: Platform.OS === "ios" ? 55 : StatusBar.currentHeight + 25,
     left: 20,
     zIndex: 10,
-    backgroundColor: "rgba(0, 0, 0, 0.1)", // Changed to dark semi-transparent
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.2)", // Changed to dark border
   },
   backButtonText: {
-    color: "#1e293b", // Changed from white to dark
+    color: "#1e293b",
     fontSize: 16,
     fontWeight: "600",
   },
@@ -191,13 +311,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#1e293b", // Changed from white to dark
+    color: "#1e293b",
     textAlign: "center",
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#64748b", // Changed from light blue to gray
+    color: "#64748b",
     textAlign: "center",
     fontWeight: "500",
   },
@@ -392,5 +512,55 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 40,
+  },
+  // New styles for loading/error states
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F0FDF4",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#64748b",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F0FDF4",
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#ef4444",
+    textAlign: "center",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F0FDF4",
+    padding: 20,
+  },
+  emptyText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#64748b",
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: "#10b981",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  retryButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

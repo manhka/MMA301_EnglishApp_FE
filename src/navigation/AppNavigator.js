@@ -13,6 +13,7 @@ import WritingScreen from "../screens/WritingScreen";
 import SpeakingScreen from "../screens/SpeakingScreen";
 import ResultScreen from "../screens/ResultScreen";
 import Result2Screen from "../screens/Result2Screen";
+import HistoryScreen from "../screens/HistoryScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -122,6 +123,15 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Result2"
           component={Result2Screen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="History"
+          component={HistoryScreen}
           options={{
             headerShown: false,
             headerLeft: () => null,

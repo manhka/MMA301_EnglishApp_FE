@@ -36,6 +36,7 @@ export default function LoginScreen({ navigation }) {
       // store token here (SecureStore) if you want
       await SecureStore.setItemAsync("userToken", res.data.token);
       await SecureStore.setItemAsync("userId", res.data.user.id);
+      await SecureStore.setItemAsync("username", res.data.user.name);
       const userName = res.data.user.name;
       navigation.replace("Home", { userName });
     } catch (err) {

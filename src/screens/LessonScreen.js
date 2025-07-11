@@ -59,38 +59,6 @@ const getLessonTypeIcon = (type) => {
   }
 };
 
-const ProgressBar = ({ current, total }) => {
-  const percent = (current / total) * 100;
-  const [animatedWidth] = useState(new Animated.Value(0));
-
-  useEffect(() => {
-    Animated.timing(animatedWidth, {
-      toValue: percent,
-      duration: 1000,
-      useNativeDriver: false,
-    }).start();
-  }, [percent]);
-
-  return (
-    <View style={styles.progressContainer}>
-      <View style={styles.progressBarBackground}>
-        <Animated.View
-          style={[
-            styles.progressBarFill,
-            {
-              width: animatedWidth.interpolate({
-                inputRange: [0, 100],
-                outputRange: ["0%", "100%"],
-              }),
-            },
-          ]}
-        />
-      </View>
-      <Text style={styles.progressText}>{Math.round(percent)}%</Text>
-    </View>
-  );
-};
-
 const LessonItem = ({ lesson, index, isLocked, navigation }) => {
   const [scaleAnim] = useState(new Animated.Value(1));
 
@@ -199,7 +167,7 @@ const LessonItem = ({ lesson, index, isLocked, navigation }) => {
             isLocked && styles.lessonButtonTextLocked,
           ]}
         >
-          {isLocked ? "🔒" : isCompleted ? "Review" : "Start"}
+          {isLocked ? "🔒" : isCompleted ? "Review" : "Do it"}
         </Text>
       </TouchableOpacity>
     </Animated.View>
@@ -286,9 +254,6 @@ const TopicCard = ({ topic, level, skill, navigation }) => {
             </View>
           </View>
           <Text style={styles.topicDescription}>{topic.description}</Text>
-          {totalLessons > 0 && (
-            <ProgressBar current={completedLessons} total={totalLessons} />
-          )}
         </View>
         <Animated.View style={styles.expandIconContainer}>
           <Animated.Text
@@ -405,7 +370,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0FDF4",
   },
   header: {
-    paddingTop: Platform.OS === "ios" ? 80 : 10,
+    paddingTop: Platform.OS === "ios" ? 45 : 10,
     paddingBottom: 24,
     paddingHorizontal: 20,
     backgroundColor: "#ffffff",
@@ -426,6 +391,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f1f5f9",
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 10,
   },
   backIcon: {
     fontSize: 20,
@@ -460,6 +426,7 @@ const styles = StyleSheet.create({
   },
   topicHeader: {
     padding: 20,
+
     flexDirection: "row",
     alignItems: "flex-start",
   },
@@ -511,28 +478,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 12,
   },
-  progressContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  progressBarBackground: {
-    flex: 1,
-    backgroundColor: "#e2e8f0",
-    height: 8,
-    borderRadius: 4,
-    marginRight: 12,
-  },
-  progressBarFill: {
-    height: "100%",
-    borderRadius: 4,
-    backgroundColor: "#10b981",
-  },
-  progressText: {
-    fontSize: 12,
-    color: "#64748b",
-    fontWeight: "600",
-  },
+
   lessonItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -627,8 +573,8 @@ const styles = StyleSheet.create({
     color: "#cbd5e1",
   },
   lessonButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 10,
     borderRadius: 20,
     minWidth: 80,
     alignItems: "center",

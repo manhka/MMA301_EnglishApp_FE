@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+"use client";
+
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,22 +12,38 @@ import {
   Platform,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Dimensions,
   StatusBar,
 } from "react-native";
 import api from "../services/api";
-
-const { width, height } = Dimensions.get("window");
+import { Ionicons } from "@expo/vector-icons";
+import * as SecureStore from "expo-secure-store";
 
 export default function WritingScreen({ route, navigation }) {
   const { lessonId } = route.params;
-  const userId = "664abc1234567890abcdef01";
   const [lesson, setLesson] = useState(null);
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [wordCount, setWordCount] = useState(0);
+  const [userId, setUserId] = useState(null);
+
+  useEffect(() => {
+    const fetchUserId = async () => {
+      try {
+        const id = await SecureStore.getItemAsync("userId");
+        if (id) {
+          setUserId(id);
+        } else {
+          Alert.alert("Error", "User not found. Please login again.");
+          navigation.navigate("Login");
+        }
+      } catch (err) {
+        console.error("Failed to get userId", err);
+      }
+    };
+    fetchUserId();
+  }, []);
 
   useEffect(() => {
     const fetchLesson = async () => {
@@ -45,11 +63,18 @@ export default function WritingScreen({ route, navigation }) {
 
   useEffect(() => {
     if (!timeLeft) return;
+
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
+
+    // Automatically submit when time runs out
+    if (timeLeft === 0 && !submitting && lesson) {
+      handleSubmit(true); // Pass true to indicate auto-submission
+    }
+
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, submitting, lesson, answer]); // Added answer to dependencies for word count update
 
   useEffect(() => {
     const words = answer
@@ -93,34 +118,6 @@ export default function WritingScreen({ route, navigation }) {
     }
   };
 
-  const handleSubmit = () => {
-    if (!answer.trim()) {
-      Alert.alert(
-        "✍️ Empty Answer",
-        "Please write your answer before submitting."
-      );
-      return;
-    }
-
-    Alert.alert(
-      "📤 Submit Writing",
-      `Are you sure you want to submit your writing?\n\nWord count: ${wordCount} words\nTime remaining: ${formatTime(
-        timeLeft
-      )}`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Submit",
-          style: "default",
-          onPress: performSubmit,
-        },
-      ]
-    );
-  };
-
   const performSubmit = async () => {
     setSubmitting(true);
     try {
@@ -130,18 +127,49 @@ export default function WritingScreen({ route, navigation }) {
         question: lesson.content,
         text: answer,
       });
-      const { aiScore, aiFeedback } = res.data;
+      const { submissionId } = res.data;
       navigation.navigate("Result2", {
-        prompt: lesson.content,
-        aiScore,
-        aiFeedback,
-        submittedAt: new Date().toISOString(),
+        writingSubmissionId: submissionId,
       });
     } catch (err) {
       console.error("Submit failed", err);
       Alert.alert("Error", "Could not submit or evaluate your writing.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSubmit = (autoSubmit = false) => {
+    // Added autoSubmit parameter
+    if (!answer.trim() && !autoSubmit) {
+      // Only show this alert if it's a manual submission and answer is empty
+      Alert.alert(
+        "✍️ Empty Answer",
+        "Please write your answer before submitting."
+      );
+      return;
+    }
+
+    if (autoSubmit) {
+      performSubmit(); // Directly submit if autoSubmit is true
+    } else {
+      Alert.alert(
+        "📤 Submit Writing",
+        `Are you sure you want to submit your writing?\n\nWord count: ${wordCount} words\nTime remaining: ${formatTime(
+          timeLeft
+        )}`,
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Submit",
+            style: "default",
+            onPress: performSubmit,
+          },
+        ]
+      );
     }
   };
 
@@ -172,9 +200,8 @@ export default function WritingScreen({ route, navigation }) {
           onPress={handleBack}
           activeOpacity={0.7}
         >
-          <Text style={styles.backButtonText}>←</Text>
+          <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>
-
         <View style={styles.headerContent}>
           <Text style={styles.title}>✍️ Writing Practice</Text>
           <Text style={styles.subtitle}>{lesson.title}</Text>
@@ -196,7 +223,6 @@ export default function WritingScreen({ route, navigation }) {
           </View>
         </View>
       </View>
-
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -217,7 +243,6 @@ export default function WritingScreen({ route, navigation }) {
             </View>
             <Text style={styles.promptText}>{lesson.content}</Text>
           </View>
-
           <View style={styles.inputSection}>
             <View style={styles.inputHeader}>
               <Text style={styles.inputLabel}>Your Response</Text>
@@ -238,13 +263,12 @@ export default function WritingScreen({ route, navigation }) {
               />
             </View>
           </View>
-
           <TouchableOpacity
             style={[
               styles.submitButton,
               !answer.trim() && styles.submitButtonDisabled,
             ]}
-            onPress={handleSubmit}
+            onPress={() => handleSubmit(false)} // Explicitly pass false for manual submission
             disabled={!answer.trim() || submitting}
             activeOpacity={0.8}
           >
@@ -252,7 +276,6 @@ export default function WritingScreen({ route, navigation }) {
               {submitting ? "Submitting..." : "📤 Submit Writing"}
             </Text>
           </TouchableOpacity>
-
           <View style={styles.bottomSpacer} />
         </ScrollView>
       </KeyboardAvoidingView>

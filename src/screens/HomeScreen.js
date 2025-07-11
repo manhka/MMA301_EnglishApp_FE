@@ -20,7 +20,23 @@ const motivationalQuotes = [
 ];
 
 export default function HomeScreen({ navigation, route }) {
-  const userName = route.params?.userName || "Student";
+  const [username, setUsername] = useState("Student");
+  useEffect(() => {
+    const fetchUsername = async () => {
+      try {
+        const username = await SecureStore.getItemAsync("username");
+        if (username) {
+          setUsername(username);
+        } else {
+          Alert.alert("Error", "User not found. Please login again.");
+          navigation.navigate("Login");
+        }
+      } catch (err) {
+        console.error("Failed to get userId", err);
+      }
+    };
+    fetchUsername();
+  }, []);
   const [selectedLevel, setSelectedLevel] = useState(null);
 
   const [currentQuote, setCurrentQuote] = useState(0);
@@ -77,7 +93,7 @@ export default function HomeScreen({ navigation, route }) {
       }),
     ]).start(async () => {
       try {
-        navigation.replace("Dashboard", { level: selectedLevel, userName });
+        navigation.replace("Dashboard", { level: selectedLevel, username });
       } catch (err) {
         console.error("Failed to store level or navigate", err);
         Alert.alert("Error", "Something went wrong while starting.");
@@ -109,7 +125,7 @@ export default function HomeScreen({ navigation, route }) {
             <Text style={styles.logoText}>📚</Text>
           </View>
           <Text style={styles.welcomeText}>Hello,</Text>
-          <Text style={styles.userName}>{userName} 👋</Text>
+          <Text style={styles.userName}>{username} 👋</Text>
         </View>
 
         {/* Select Level */}
