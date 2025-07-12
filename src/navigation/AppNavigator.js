@@ -17,6 +17,7 @@ import HistoryScreen from "../screens/HistoryScreen";
 import AdminScreen from "../screens/AdminScreen";
 import CreateReadingLessonScreen from "../screens/CreateReadingLessonScreen";
 import CreateWritingLessonScreen from "../screens/CreateWritingLessonScreen";
+import CreateListeningLessonScreen from "../screens/CreateListeningLessonScreen";
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
@@ -156,6 +157,11 @@ export default function AppNavigator() {
         <Stack.Screen
         name="CreateWritingLessonScreen"
         component={CreateWritingLessonScreen}
+        options={{ title: "Tạo Bài Học" }}
+      />
+        <Stack.Screen
+        name="CreateListeningLessonScreen"
+        component={CreateListeningLessonScreen}
         options={{ title: "Tạo Bài Học" }}
       />
       </Stack.Navigator>
