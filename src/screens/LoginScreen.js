@@ -38,7 +38,7 @@ export default function LoginScreen({ navigation }) {
       await SecureStore.setItemAsync("userId", res.data.user.id);
       await SecureStore.setItemAsync("username", res.data.user.name);
       const userName = res.data.user.name;
-      navigation.replace("Home", { userName });
+      navigation.replace("Admin", { userName });
     } catch (err) {
       console.log(err);
       Alert.alert(
