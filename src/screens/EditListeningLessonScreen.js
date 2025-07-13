@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,27 +7,65 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 
-export default function CreateListeningLessonScreen() {
+export default function EditListeningLessonScreen() {
   const navigation = useNavigation();
   const { params } = useRoute();
-  const { skill, skillName, level, adminName } = params || {};
+  const { id } = params || {};
+
+  const [loading, setLoading] = useState(true);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [topicName, setTopicName] = useState("");
   const [topicDescription, setTopicDescription] = useState("");
-  const [questions, setQuestions] = useState([]);
   const [audioFile, setAudioFile] = useState(null);
+  const [questions, setQuestions] = useState([]);
+
   const [addingQuestion, setAddingQuestion] = useState(false);
   const [newQuestionText, setNewQuestionText] = useState("");
   const [newQuestionType, setNewQuestionType] = useState("single-choice");
   const [newChoices, setNewChoices] = useState([""]);
   const [correctAnswers, setCorrectAnswers] = useState([]);
+
+  const [skill, setSkill] = useState("");
+  const [level, setLevel] = useState("");
+
+  useEffect(() => {
+    fetchLesson();
+  }, []);
+
+  const fetchLesson = async () => {
+    try {
+      const res = await fetch(`http://192.168.1.45:9999/api/lessons/${id}`);
+      const lesson = await res.json();
+      setTitle(lesson.title || "");
+      setContent(lesson.content || "");
+      setSkill(lesson.skill);
+      setLevel(lesson.level);
+      setTopicName(lesson.topic?.name || "");
+      setTopicDescription(lesson.topic?.description || "");
+      setQuestions(lesson.questions || []);
+      if (lesson.media && lesson.media.url) {
+        setAudioFile({
+          uri: `http://192.168.1.45:9999/${lesson.media.url}`,
+          name: lesson.media.filename || "audio.mp3",
+          type: "audio/mpeg",
+        });
+      }
+    } catch (err) {
+      console.error("Fetch error", err);
+      Alert.alert("Error", "Failed to load lesson data.");
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePickFile = async () => {
     try {
@@ -45,11 +81,9 @@ export default function CreateListeningLessonScreen() {
           name: file.name,
           type: file.mimeType || "audio/mpeg",
         });
-      } else {
-        setAudioFile(null);
       }
     } catch (err) {
-      console.error("File pick error:", err);
+      console.error("Pick file error:", err);
       Alert.alert("Error", "Failed to pick audio file.");
     }
   };
@@ -60,10 +94,7 @@ export default function CreateListeningLessonScreen() {
       newChoices.some((c) => !c) ||
       correctAnswers.length === 0
     ) {
-      Alert.alert(
-        "Validation",
-        "Please complete question, choices, and select correct answer(s)."
-      );
+      Alert.alert("Validation", "Please complete all fields.");
       return;
     }
     const newQ = {
@@ -82,7 +113,7 @@ export default function CreateListeningLessonScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!title.trim() || !content.trim() || !audioFile?.uri) {
+    if (!title.trim() || !content.trim()) {
       Alert.alert("Validation", "Please fill all required fields.");
       return;
     }
@@ -97,42 +128,41 @@ export default function CreateListeningLessonScreen() {
       JSON.stringify({ name: topicName, description: topicDescription })
     );
     formData.append("questions", JSON.stringify(questions));
-    formData.append("media", {
-      uri: audioFile.uri,
-      name: audioFile.name,
-      type: audioFile.type,
-    });
+    if (audioFile && audioFile.uri && audioFile.uri.startsWith("file://")) {
+      formData.append("media", {
+        uri: audioFile.uri,
+        name: audioFile.name,
+        type: audioFile.type,
+      });
+    }
 
     try {
-      const response = await fetch(
-        "http://192.168.1.65:9999/api/lessons/full",
-        {
-          method: "POST",
-          headers: { "Content-Type": "multipart/form-data" },
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Server error:", errorText);
-        throw new Error("Server error");
-      }
-
-      Alert.alert("Success", "Lesson created successfully.", [
+      const res = await fetch(`http://192.168.1.65:9999/api/lessons/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "multipart/form-data" },
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Server error");
+      Alert.alert("Success", "Lesson updated successfully.", [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
     } catch (err) {
       console.error("Upload error:", err);
-      Alert.alert("Error", "Failed to create lesson.");
+      Alert.alert("Error", "Failed to update lesson.");
     }
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.header}>
-        Create {skillName} Lesson ({level})
-      </Text>
+      <Text style={styles.header}>Edit Listening Lesson ({level})</Text>
       <TextInput
         style={styles.input}
         placeholder="Title *"
@@ -150,7 +180,7 @@ export default function CreateListeningLessonScreen() {
       <TouchableOpacity style={styles.fileBtn} onPress={handlePickFile}>
         <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
         <Text style={styles.fileBtnText}>
-          {audioFile ? audioFile.name : "Pick Audio File *"}
+          {audioFile ? audioFile.name : "Pick Audio File"}
         </Text>
       </TouchableOpacity>
 
@@ -201,15 +231,12 @@ export default function CreateListeningLessonScreen() {
                 : "Switch to Single Choice"}
             </Text>
           </TouchableOpacity>
-          {newChoices.map((choice, i) => (
-            <View
-              key={i}
-              style={{ flexDirection: "row", alignItems: "center" }}
-            >
+          {newChoices.map((c, i) => (
+            <View key={i} style={{ flexDirection: "row", alignItems: "center" }}>
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 placeholder={`Choice ${i + 1}`}
-                value={choice}
+                value={c}
                 onChangeText={(txt) => {
                   const updated = [...newChoices];
                   updated[i] = txt;
@@ -272,7 +299,7 @@ export default function CreateListeningLessonScreen() {
       )}
 
       <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-        <Text style={styles.submitText}>Create Lesson</Text>
+        <Text style={styles.submitText}>Update Lesson</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -280,12 +307,8 @@ export default function CreateListeningLessonScreen() {
 
 const styles = StyleSheet.create({
   container: { padding: 20, backgroundColor: "#F0FDF4" },
-  header: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1e293b",
-    marginBottom: 16,
-  },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  header: { fontSize: 22, fontWeight: "700", color: "#1e293b", marginBottom: 16 },
   subHeader: {
     fontSize: 18,
     fontWeight: "600",
@@ -301,10 +324,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  textArea: {
-    height: 80,
-    textAlignVertical: "top",
-  },
+  textArea: { height: 80, textAlignVertical: "top" },
   fileBtn: {
     flexDirection: "row",
     alignItems: "center",

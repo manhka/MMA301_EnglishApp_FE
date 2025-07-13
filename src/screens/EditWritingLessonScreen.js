@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,55 +7,82 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import api from "../services/api";
 
-export default function CreateLessonWritingScreen() {
+export default function EditWritingLessonScreen() {
   const { params } = useRoute();
   const navigation = useNavigation();
-  const { level } = params;
+  const { id } = params;
+
+  const [loading, setLoading] = useState(true);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [topicName, setTopicName] = useState("");
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState("20");
+  const [level, setLevel] = useState("");
 
-  const handleSubmit = async () => {
+  useEffect(() => {
+    fetchLesson();
+  }, []);
+
+  const fetchLesson = async () => {
+    try {
+      const res = await api.get(`/lessons/${id}`);
+      const lesson = res.data;
+      setTitle(lesson.title || "");
+      setContent(lesson.content || "");
+      setDuration(String(lesson.duration || "20"));
+      setLevel(lesson.level || "");
+      setTopicName(lesson.topicId?.name || "");
+      setDescription(lesson.topicId?.description || "");
+    } catch (err) {
+      console.error("Fetch lesson failed", err);
+      Alert.alert("Lỗi", "Không thể tải dữ liệu bài học.");
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdate = async () => {
     if (!title || !content || !topicName || !description) {
-      Alert.alert("Thiếu thông tin", "Vui lòng điền đầy đủ thông tin.");
+      Alert.alert("Validation", "Please fill all required fields.");
       return;
     }
 
     try {
-      await api.post("/lessons/full", {
+      await api.put(`/lessons/${id}`, {
         title,
         skill: "writing",
         level,
         content,
         duration: parseInt(duration),
-        topic: {
-          name: topicName,
-          description,
-        },
-        media: [],
-        questions: [], // Writing không có câu hỏi
+        topic: { name: topicName, description },
       });
 
-      Alert.alert("Thành công", "Lesson Writing đã được tạo.", [
-        {
-          text: "OK",
-          onPress: () => navigation.goBack(),
-        },
+      Alert.alert("Success", "Lesson updated successfully.", [
+        { text: "OK", onPress: () => navigation.goBack() },
       ]);
     } catch (err) {
-      console.error("Create failed", err.response?.data || err.message);
-      Alert.alert("Lỗi", "Không thể tạo lesson.");
+      console.error("Update failed", err.response?.data || err);
+      Alert.alert("Error", "Failed to update lesson.");
     }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -68,7 +95,7 @@ export default function CreateLessonWritingScreen() {
         contentContainerStyle={{ paddingBottom: 80 }}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.header}>Create Writing Lesson ({level})</Text>
+        <Text style={styles.header}>Edit Writing Lesson</Text>
 
         <TextInput
           placeholder="Title *"
@@ -104,8 +131,8 @@ export default function CreateLessonWritingScreen() {
           onChangeText={setDuration}
         />
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-          <Text style={styles.submitText}>Create Lesson</Text>
+        <TouchableOpacity style={styles.submitBtn} onPress={handleUpdate}>
+          <Text style={styles.submitText}>Update Lesson</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -144,7 +171,7 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   submitBtn: {
-    backgroundColor: "#10b981",
+    backgroundColor: "#3b82f6",
     borderRadius: 8,
     padding: 16,
     marginTop: 24,
@@ -154,5 +181,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
     fontSize: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

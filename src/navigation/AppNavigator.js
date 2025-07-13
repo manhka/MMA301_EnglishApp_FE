@@ -18,6 +18,10 @@ import AdminScreen from "../screens/AdminScreen";
 import CreateReadingLessonScreen from "../screens/CreateReadingLessonScreen";
 import CreateWritingLessonScreen from "../screens/CreateWritingLessonScreen";
 import CreateListeningLessonScreen from "../screens/CreateListeningLessonScreen";
+import ViewAllLessonScreen from "../screens/ViewAllLessonScreen";
+import EditReadingLessonScreen from "../screens/EditReadingLessonScreen";
+import EditListeningLessonScreen from "../screens/EditListeningLessonScreen";
+import EditWritingLessonScreen from "../screens/EditWritingLessonScreen";
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
@@ -163,6 +167,26 @@ export default function AppNavigator() {
         name="CreateListeningLessonScreen"
         component={CreateListeningLessonScreen}
         options={{ title: "Tạo Bài Học" }}
+      />
+        <Stack.Screen
+        name="ViewAllLessonScreen"
+        component={ViewAllLessonScreen}
+        options={{ title: "Xem Bài Học" }}
+      />
+        <Stack.Screen
+        name="EditWritingLessonScreen"
+        component={EditWritingLessonScreen}
+        options={{ title: "Sửa Bài Học" }}
+      />
+        <Stack.Screen
+        name="EditReadingLessonScreen"
+        component={EditReadingLessonScreen}
+        options={{ title: "Sửa Bài Học" }}
+      />
+        <Stack.Screen
+        name="EditListeningLessonScreen"
+        component={EditListeningLessonScreen}
+        options={{ title: "Sửa Bài Học" }}
       />
       </Stack.Navigator>
     </NavigationContainer>

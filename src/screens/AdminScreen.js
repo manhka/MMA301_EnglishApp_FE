@@ -13,7 +13,6 @@ const ieltsSkills = [
   { id: "listening", name: "Listening", icon: "🎧" },
   { id: "reading", name: "Reading", icon: "📖" },
   { id: "writing", name: "Writing", icon: "✍️" },
-  { id: "speaking", name: "Speaking", icon: "🗣️" },
 ];
 
 const levels = [
@@ -27,6 +26,7 @@ export default function AdminScreen({ navigation, route }) {
   const [selectedLevel, setSelectedLevel] = useState(null);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const levelScales = useRef(levels.map(() => new Animated.Value(1))).current;
 
   useEffect(() => {
     Animated.timing(slideAnim, {
@@ -36,37 +36,49 @@ export default function AdminScreen({ navigation, route }) {
     }).start();
   }, []);
 
+  const handleLevelPress = (level, index) => {
+    setSelectedLevel(level.id);
+    Animated.spring(levelScales[index], {
+      toValue: 1.1,
+      useNativeDriver: true,
+    }).start(() => {
+      Animated.spring(levelScales[index], {
+        toValue: 1,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
   const handleSkillSelect = (skill) => {
-  if (!selectedLevel) {
-    Alert.alert("Chưa chọn Level", "Vui lòng chọn một level trước.");
-    return;
-  }
-
-  let screenName = "";
-
-  switch (skill.id) {
-    case "reading":
-      screenName = "CreateReadingLessonScreen";
-      break;
-    case "listening":
-      screenName = "CreateListeningLessonScreen";
-      break;
-    case "writing":
-      screenName = "CreateWritingLessonScreen";
-      break;
-    default:
-      Alert.alert("Lỗi", "Kỹ năng chưa được hỗ trợ.");
+    if (!selectedLevel) {
+      Alert.alert("Chưa chọn Level", "Vui lòng chọn một level trước.");
       return;
-  }
+    }
 
-  navigation.navigate(screenName, {
-    adminName,
-    skill: skill.id,
-    skillName: skill.name,
-    level: selectedLevel,
-  });
-};
+    let screenName = "";
 
+    switch (skill.id) {
+      case "reading":
+        screenName = "CreateReadingLessonScreen";
+        break;
+      case "listening":
+        screenName = "CreateListeningLessonScreen";
+        break;
+      case "writing":
+        screenName = "CreateWritingLessonScreen";
+        break;
+      default:
+        Alert.alert("Lỗi", "Kỹ năng chưa được hỗ trợ.");
+        return;
+    }
+
+    navigation.navigate(screenName, {
+      adminName,
+      skill: skill.id,
+      skillName: skill.name,
+      level: selectedLevel,
+    });
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -92,30 +104,37 @@ export default function AdminScreen({ navigation, route }) {
             <Text style={styles.logoText}>📝</Text>
           </View>
           <Text style={styles.welcomeText}>Chào mừng, {adminName}!</Text>
-          <Text style={styles.title}>Chọn Level và kỹ năng IELTS</Text>
+          <Text style={styles.title}>Chọn Level và kỹ năng</Text>
         </View>
 
         {/* Level Selector */}
         <View style={styles.levelSelector}>
-          {levels.map((level) => (
-            <TouchableOpacity
+          {levels.map((level, index) => (
+            <Animated.View
               key={level.id}
               style={[
-                styles.levelButton,
-                selectedLevel === level.id && styles.levelButtonSelected,
+                styles.levelButtonWrapper,
+                { transform: [{ scale: levelScales[index] }] },
               ]}
-              onPress={() => setSelectedLevel(level.id)}
-              activeOpacity={0.8}
             >
-              <Text
+              <TouchableOpacity
                 style={[
-                  styles.levelText,
-                  selectedLevel === level.id && styles.levelTextSelected,
+                  styles.levelButton,
+                  selectedLevel === level.id && styles.levelButtonSelected,
                 ]}
+                onPress={() => handleLevelPress(level, index)}
+                activeOpacity={0.9}
               >
-                {level.name}
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.levelText,
+                    selectedLevel === level.id && styles.levelTextSelected,
+                  ]}
+                >
+                  {level.name}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
           ))}
         </View>
 
@@ -133,6 +152,17 @@ export default function AdminScreen({ navigation, route }) {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* View All Lessons Button */}
+        <TouchableOpacity
+          style={styles.viewAllButton}
+          onPress={() =>
+            navigation.navigate("ViewAllLessonScreen", { adminName })
+          }
+          activeOpacity={0.85}
+        >
+          <Text style={styles.viewAllButtonText}>Xem tất cả Lesson</Text>
+        </TouchableOpacity>
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -176,24 +206,30 @@ const styles = StyleSheet.create({
 
   // Level
   levelSelector: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 12,
     marginBottom: 30,
+  },
+  levelButtonWrapper: {
+    marginVertical: 6,
   },
   levelButton: {
     borderWidth: 1,
-    borderColor: "#DC2626",
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 10,
-    backgroundColor: "#FFF",
+    borderColor: "#34D399",
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 12,
+    backgroundColor: "#DCFCE7",
+    minWidth: 200,
+    alignItems: "center",
   },
   levelButtonSelected: {
-    backgroundColor: "#DC2626",
+    backgroundColor: "#34D399",
   },
   levelText: {
     fontSize: 16,
-    color: "#DC2626",
+    color: "#065F46",
     fontWeight: "600",
   },
   levelTextSelected: {
@@ -224,6 +260,27 @@ const styles = StyleSheet.create({
   },
   skillIcon: { fontSize: 48, marginBottom: 10 },
   skillName: { fontSize: 18, fontWeight: "bold", color: "#111827" },
+
+  viewAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#34D399",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
+    marginBottom: 20,
+  },
+  viewAllButtonText: {
+    color: "#FFF",
+    fontSize: 18,
+    fontWeight: "700",
+  },
 
   // Footer
   footer: { alignItems: "center", paddingVertical: 20 },

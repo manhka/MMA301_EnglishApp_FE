@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,30 +9,64 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Picker } from "@react-native-picker/picker";
 import api from "../services/api";
 
-export default function CreateReadingLessonScreen() {
+export default function EditReadingLessonScreen() {
   const { params } = useRoute();
   const navigation = useNavigation();
-  const { level } = params;
+  const { id } = params || {};
+
+  const [loading, setLoading] = useState(true);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [topicName, setTopicName] = useState("");
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState("10");
+  const [level, setLevel] = useState("");
+  const [questions, setQuestions] = useState([]);
 
-  const [questions, setQuestions] = useState([
-    {
-      questionText: "",
-      choices: ["", "", "", ""],
-      correctAnswers: [0],
-      type: "single-choice",
-    },
-  ]);
+  useEffect(() => {
+    fetchLesson();
+  }, []);
+
+  const fetchLesson = async () => {
+    try {
+      const res = await api.get(`/lessons/${id}`);
+      const lesson = res.data;
+      setTitle(lesson.title || "");
+      setContent(lesson.content || "");
+      setTopicName(lesson.topicId?.name || "");
+      setDescription(lesson.topicId?.description || "");
+      setDuration(String(lesson.duration || "10"));
+      setLevel(lesson.level || "");
+
+      const mappedQuestions = (lesson.questions || []).map((q) => ({
+        _id: q._id, // GIỮ _id để update
+        questionText: q.questionText,
+        choices:
+          q.type === "true-false"
+            ? ["True", "False"]
+            : q.choices?.length
+            ? q.choices
+            : ["", "", "", ""],
+        correctAnswers: q.correctAnswers || [],
+        type: q.type || "single-choice",
+      }));
+
+      setQuestions(mappedQuestions);
+    } catch (err) {
+      console.error("Fetch error", err);
+      Alert.alert("Error", "Failed to load lesson.");
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddQuestion = () => {
     setQuestions([
@@ -40,19 +74,32 @@ export default function CreateReadingLessonScreen() {
       {
         questionText: "",
         choices: ["", "", "", ""],
-        correctAnswers: [0],
+        correctAnswers: [],
         type: "single-choice",
       },
     ]);
+  };
+
+  const handleDeleteQuestion = (index) => {
+    const updated = [...questions];
+    updated.splice(index, 1);
+    setQuestions(updated);
   };
 
   const handleQuestionChange = (index, field, value) => {
     const updated = [...questions];
     updated[index][field] = value;
 
-    if (field === "type" && value === "true-false") {
-      updated[index].choices = ["True", "False"];
-      updated[index].correctAnswers = [0];
+    if (field === "type") {
+      if (value === "true-false") {
+        updated[index].choices = ["True", "False"];
+        updated[index].correctAnswers = [0];
+      } else {
+        if (questions[index].type === "true-false") {
+          updated[index].choices = ["", "", "", ""];
+          updated[index].correctAnswers = [];
+        }
+      }
     }
 
     setQuestions(updated);
@@ -83,42 +130,48 @@ export default function CreateReadingLessonScreen() {
 
   const handleSubmit = async () => {
     if (!title || !content || !topicName || !description) {
-      Alert.alert("Thiếu thông tin", "Vui lòng điền đầy đủ thông tin bài học");
+      Alert.alert("Validation", "Please fill all required fields.");
       return;
     }
 
     try {
       const finalQuestions = questions.map((q) => ({
-        ...q,
+        _id: q._id, // GIỮ _id nếu có để server update
+        questionText: q.questionText,
+        choices: q.choices,
+        correctAnswers: q.correctAnswers,
+        type: q.type,
         skill: "reading",
-        level: level,
+        level,
       }));
 
-      await api.post("/lessons/full", {
+      await api.put(`/lessons/${id}`, {
         title,
         skill: "reading",
         level,
         content,
         duration: parseInt(duration),
-        topic: {
-          name: topicName,
-          description,
-        },
+        topic: { name: topicName, description },
         media: [],
         questions: finalQuestions,
       });
 
-      Alert.alert("Thành công", "Bài học đã được tạo", [
-        {
-          text: "OK",
-          onPress: () => navigation.goBack(),
-        },
+      Alert.alert("Success", "Lesson updated successfully.", [
+        { text: "OK", onPress: () => navigation.goBack() },
       ]);
     } catch (err) {
-      console.error("Create failed", err.response?.data || err.message);
-      Alert.alert("Lỗi", "Không thể tạo bài học");
+      console.error("Update failed", err.response?.data || err);
+      Alert.alert("Error", "Failed to update lesson.");
     }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -131,7 +184,7 @@ export default function CreateReadingLessonScreen() {
         contentContainerStyle={{ paddingBottom: 80 }}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.header}>Create Reading Lesson ({level})</Text>
+        <Text style={styles.header}>Edit Reading Lesson ({level})</Text>
 
         <TextInput
           placeholder="Title *"
@@ -140,8 +193,8 @@ export default function CreateReadingLessonScreen() {
           onChangeText={setTitle}
         />
         <TextInput
-          placeholder="Reading Content *"
-          style={[styles.input, styles.textArea]}
+          placeholder="Reading Passage *"
+          style={[styles.input, styles.textAreaLarge]}
           multiline
           value={content}
           onChangeText={setContent}
@@ -170,13 +223,24 @@ export default function CreateReadingLessonScreen() {
         <Text style={styles.subHeader}>Questions</Text>
         {questions.map((q, index) => (
           <View key={index} style={styles.questionBlock}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ fontWeight: "600" }}>Question {index + 1}</Text>
+              <TouchableOpacity onPress={() => handleDeleteQuestion(index)}>
+                <Text style={{ color: "#ef4444", fontWeight: "600" }}>Delete</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
-              placeholder={`Question ${index + 1}`}
+              placeholder="Question Text"
               style={styles.input}
               value={q.questionText}
               onChangeText={(text) => handleQuestionChange(index, "questionText", text)}
             />
-
             <Picker
               selectedValue={q.type}
               style={styles.picker}
@@ -186,7 +250,6 @@ export default function CreateReadingLessonScreen() {
               <Picker.Item label="Multiple Choice" value="multiple-choice" />
               <Picker.Item label="True/False" value="true-false" />
             </Picker>
-
             {q.choices.map((choice, cIndex) => (
               <View key={cIndex} style={styles.choiceRow}>
                 {q.type !== "true-false" ? (
@@ -224,7 +287,7 @@ export default function CreateReadingLessonScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-          <Text style={styles.submitText}>Create Lesson</Text>
+          <Text style={styles.submitText}>Update Lesson</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -233,6 +296,7 @@ export default function CreateReadingLessonScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#F0FDF4" },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     fontSize: 22,
     fontWeight: "700",
@@ -254,10 +318,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  textArea: {
-    height: 80,
-    textAlignVertical: "top",
-  },
+  textAreaLarge: { height: 180, textAlignVertical: "top" },
   questionBlock: {
     backgroundColor: "#fff",
     borderRadius: 8,
@@ -266,9 +327,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  picker: {
-    marginBottom: 12,
-  },
+  picker: { marginBottom: 12 },
   choiceRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -280,9 +339,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "#e5e7eb",
   },
-  correctBtnActive: {
-    backgroundColor: "#10b981",
-  },
+  correctBtnActive: { backgroundColor: "#10b981" },
   addQuestionBtn: {
     backgroundColor: "#10b981",
     borderRadius: 8,
