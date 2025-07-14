@@ -135,17 +135,6 @@ export default function LoginScreen({ navigation }) {
                   )}
                 </View>
 
-                {/* Options */}
-                <View style={styles.optionsContainer}>
-                  <TouchableOpacity style={styles.rememberContainer}>
-                    <View style={styles.checkbox} />
-                    <Text style={styles.rememberText}>Remember me</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity>
-                    <Text style={styles.forgotText}>Forgot password?</Text>
-                  </TouchableOpacity>
-                </View>
-
                 {/* Submit */}
                 <TouchableOpacity
                   style={[styles.button, isSubmitting && styles.buttonDisabled]}
