@@ -28,6 +28,7 @@ export default function AppNavigator() {
             headerShown: false,
             headerLeft: () => null,
             gestureEnabled: false,
+            tabBarStyle: { display: "none" },
           }}
         />
         <Stack.Screen

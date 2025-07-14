@@ -10,7 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-
+import * as NavigationBar from "expo-navigation-bar";
+import { useEffect } from "react";
 import { Formik } from "formik";
 import * as Yup from "yup";
 import api from "../services/api";
@@ -26,6 +27,14 @@ const LoginSchema = Yup.object().shape({
 });
 
 export default function LoginScreen({ navigation }) {
+  useEffect(() => {
+    const hideNavBar = async () => {
+      await NavigationBar.setVisibilityAsync("hidden");
+      await NavigationBar.setBehaviorAsync("immersive"); // hoặc 'inset-swipe' nếu bạn muốn vuốt để hiện lại
+    };
+
+    hideNavBar();
+  }, []);
   const handleLogin = async (values, { setSubmitting }) => {
     try {
       const res = await api.post("/auth/login", {

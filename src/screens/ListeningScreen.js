@@ -13,6 +13,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Animated,
+  Platform,
 } from "react-native";
 import { Audio } from "expo-av";
 import { Ionicons } from "@expo/vector-icons";
@@ -526,6 +527,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F0FDF4",
+    marginTop: Platform.OS === "android" ? StatusBar.currentHeight + 5 : 0,
   },
   loadingContainer: {
     flex: 1,

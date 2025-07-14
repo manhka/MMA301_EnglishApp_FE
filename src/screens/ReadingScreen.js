@@ -12,6 +12,7 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import api from "../services/api";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -419,6 +420,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F0FDF4",
+    marginTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   loadingContainer: {
     flex: 1,
