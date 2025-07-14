@@ -16,6 +16,7 @@ import { Formik } from "formik";
 import * as Yup from "yup";
 import api from "../services/api";
 import * as SecureStore from "expo-secure-store";
+import { jwtDecode } from "jwt-decode";
 // schema validation
 const LoginSchema = Yup.object().shape({
   email: Yup.string()
@@ -41,13 +42,20 @@ export default function LoginScreen({ navigation }) {
         email: values.email,
         password: values.password,
       });
-      console.log("token:", res.data.token);
-      // store token here (SecureStore) if you want
-      await SecureStore.setItemAsync("userToken", res.data.token);
-      await SecureStore.setItemAsync("userId", res.data.user.id);
-      await SecureStore.setItemAsync("username", res.data.user.name);
-      const userName = res.data.user.name;
-      navigation.replace("Home", { userName });
+
+      const { token } = res.data;
+      const decoded = jwtDecode(token); // dùng bình thường
+      const { role, name, userId } = decoded;
+      console.log(`${role} - ${name} - ${userId}`);
+      await SecureStore.setItemAsync("userToken", token);
+      await SecureStore.setItemAsync("userId", String(userId));
+      await SecureStore.setItemAsync("username", String(name));
+      await SecureStore.setItemAsync("userRole", String(role));
+      if (role === "admin") {
+        navigation.replace("AdminHome", { userName: name });
+      } else {
+        navigation.replace("Home", { userName: name });
+      }
     } catch (err) {
       console.log(err);
       Alert.alert(
@@ -58,7 +66,6 @@ export default function LoginScreen({ navigation }) {
       setSubmitting(false);
     }
   };
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
