@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { BASE_URL } from "../constants/constants";
 const api = axios.create({
   baseURL: `${BASE_URL}/api`,
-  timeout: 15000,
+  timeout: 5000,
 });
 api.interceptors.request.use(
   async (config) => {
