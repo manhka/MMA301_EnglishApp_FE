@@ -1,52 +1,130 @@
+"use client";
 import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   Alert,
+  StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
+import { useFormik } from "formik";
+import * as Yup from "yup";
 import api from "../services/api";
 
 export default function EditReadingLessonScreen() {
   const { params } = useRoute();
   const navigation = useNavigation();
   const { id } = params || {};
-
+  const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [topicName, setTopicName] = useState("");
-  const [description, setDescription] = useState("");
-  const [duration, setDuration] = useState("10");
   const [level, setLevel] = useState("");
   const [questions, setQuestions] = useState([]);
 
+  const formik = useFormik({
+    initialValues: {
+      title: "",
+      content: "",
+      topicId: "",
+      duration: "10",
+    },
+    validationSchema: Yup.object({
+      title: Yup.string().required("Title is required"),
+      content: Yup.string().required("Content is required"),
+      topicId: Yup.string().required("Please select a topic"),
+      duration: Yup.number().min(1).required("Duration is required"),
+    }),
+    onSubmit: async (values) => {
+      const selectedTopic = topics.find((t) => t._id === values.topicId);
+      if (!selectedTopic) {
+        Alert.alert("Error", "Selected topic not found.");
+        return;
+      }
+      const invalidQuestionIndex = questions.findIndex(
+        (q) =>
+          !q.questionText.trim() ||
+          q.choices.some((c) => !c.trim()) ||
+          q.correctAnswers.length === 0
+      );
+
+      if (invalidQuestionIndex !== -1) {
+        Alert.alert(
+          "Invalid Question",
+          `Please complete all fields and select at least one correct answer for question ${
+            invalidQuestionIndex + 1
+          }.`
+        );
+        return;
+      }
+      try {
+        const finalQuestions = questions.map((q) => ({
+          _id: q._id,
+          questionText: q.questionText,
+          choices: q.choices,
+          correctAnswers: q.correctAnswers,
+          type: q.type,
+          skill: "reading",
+          level,
+        }));
+
+        await api.put(`/lessons/${id}`, {
+          title: values.title,
+          skill: "reading",
+          level,
+          content: values.content,
+          duration: parseInt(values.duration),
+          topic: {
+            name: selectedTopic.name,
+            description: selectedTopic.description,
+          },
+          media: [],
+          questions: finalQuestions,
+        });
+
+        Alert.alert("Success", "Lesson updated successfully", [
+          { text: "OK", onPress: () => navigation.goBack() },
+        ]);
+      } catch (err) {
+        console.error("Update failed", err.response?.data || err);
+        Alert.alert("Error", "Failed to update lesson.");
+      }
+    },
+  });
+  const fetchTopics = async () => {
+    try {
+      const res = await api.get("/topic/all");
+      setTopics(Array.isArray(res.data.topics) ? res.data.topics : []);
+    } catch (err) {
+      console.error("Failed to fetch topics:", err);
+    }
+  };
   useEffect(() => {
     fetchLesson();
+    fetchTopics();
   }, []);
 
   const fetchLesson = async () => {
     try {
       const res = await api.get(`/lessons/${id}`);
       const lesson = res.data;
-      setTitle(lesson.title || "");
-      setContent(lesson.content || "");
-      setTopicName(lesson.topicId?.name || "");
-      setDescription(lesson.topicId?.description || "");
-      setDuration(String(lesson.duration || "10"));
+      formik.setValues({
+        title: lesson.title || "",
+        content: lesson.content || "",
+        topicId: lesson.topicId?._id || "",
+        duration: String(lesson.duration || "10"),
+      });
       setLevel(lesson.level || "");
 
       const mappedQuestions = (lesson.questions || []).map((q) => ({
-        _id: q._id, // GIỮ _id để update
+        _id: q._id,
         questionText: q.questionText,
         choices:
           q.type === "true-false"
@@ -60,8 +138,7 @@ export default function EditReadingLessonScreen() {
 
       setQuestions(mappedQuestions);
     } catch (err) {
-      console.error("Fetch error", err);
-      Alert.alert("Error", "Failed to load lesson.");
+      Alert.alert("Error", "Failed to load lesson");
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -94,11 +171,9 @@ export default function EditReadingLessonScreen() {
       if (value === "true-false") {
         updated[index].choices = ["True", "False"];
         updated[index].correctAnswers = [0];
-      } else {
-        if (questions[index].type === "true-false") {
-          updated[index].choices = ["", "", "", ""];
-          updated[index].correctAnswers = [];
-        }
+      } else if (questions[index].type === "true-false") {
+        updated[index].choices = ["", "", "", ""];
+        updated[index].correctAnswers = [];
       }
     }
 
@@ -118,197 +193,227 @@ export default function EditReadingLessonScreen() {
     if (question.type === "single-choice" || question.type === "true-false") {
       question.correctAnswers = [cIndex];
     } else {
-      if (question.correctAnswers.includes(cIndex)) {
-        question.correctAnswers = question.correctAnswers.filter((i) => i !== cIndex);
-      } else {
-        question.correctAnswers.push(cIndex);
-      }
+      question.correctAnswers = question.correctAnswers.includes(cIndex)
+        ? question.correctAnswers.filter((i) => i !== cIndex)
+        : [...question.correctAnswers, cIndex];
     }
 
     setQuestions(updated);
   };
 
-  const handleSubmit = async () => {
-    if (!title || !content || !topicName || !description) {
-      Alert.alert("Validation", "Please fill all required fields.");
-      return;
-    }
-
-    try {
-      const finalQuestions = questions.map((q) => ({
-        _id: q._id, // GIỮ _id nếu có để server update
-        questionText: q.questionText,
-        choices: q.choices,
-        correctAnswers: q.correctAnswers,
-        type: q.type,
-        skill: "reading",
-        level,
-      }));
-
-      await api.put(`/lessons/${id}`, {
-        title,
-        skill: "reading",
-        level,
-        content,
-        duration: parseInt(duration),
-        topic: { name: topicName, description },
-        media: [],
-        questions: finalQuestions,
-      });
-
-      Alert.alert("Success", "Lesson updated successfully.", [
-        { text: "OK", onPress: () => navigation.goBack() },
-      ]);
-    } catch (err) {
-      console.error("Update failed", err.response?.data || err);
-      Alert.alert("Error", "Failed to update lesson.");
-    }
-  };
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#10b981" />
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={80}
-    >
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={{ paddingBottom: 80 }}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F0FDF4" }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <Text style={styles.header}>Edit Reading Lesson ({level})</Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#1e293b" />
+          </TouchableOpacity>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Edit Reading Lesson</Text>
+            <Text style={styles.subtitle}>Level: {level}</Text>
+          </View>
+        </View>
 
-        <TextInput
-          placeholder="Title *"
-          style={styles.input}
-          value={title}
-          onChangeText={setTitle}
-        />
-        <TextInput
-          placeholder="Reading Passage *"
-          style={[styles.input, styles.textAreaLarge]}
-          multiline
-          value={content}
-          onChangeText={setContent}
-        />
-        <Text style={styles.subHeader}>Topic</Text>
-        <TextInput
-          placeholder="Topic Name"
-          style={styles.input}
-          value={topicName}
-          onChangeText={setTopicName}
-        />
-        <TextInput
-          placeholder="Topic Description"
-          style={styles.input}
-          value={description}
-          onChangeText={setDescription}
-        />
-        <TextInput
-          placeholder="Duration (minutes)"
-          style={styles.input}
-          keyboardType="numeric"
-          value={duration}
-          onChangeText={setDuration}
-        />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.label}>Title *</Text>
+          <TextInput
+            style={styles.input}
+            value={formik.values.title}
+            onChangeText={formik.handleChange("title")}
+            onBlur={formik.handleBlur("title")}
+          />
+          {formik.touched.title && formik.errors.title && (
+            <Text style={styles.errorText}>{formik.errors.title}</Text>
+          )}
 
-        <Text style={styles.subHeader}>Questions</Text>
-        {questions.map((q, index) => (
-          <View key={index} style={styles.questionBlock}>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ fontWeight: "600" }}>Question {index + 1}</Text>
-              <TouchableOpacity onPress={() => handleDeleteQuestion(index)}>
-                <Text style={{ color: "#ef4444", fontWeight: "600" }}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              placeholder="Question Text"
-              style={styles.input}
-              value={q.questionText}
-              onChangeText={(text) => handleQuestionChange(index, "questionText", text)}
-            />
+          <Text style={styles.label}>Content *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            multiline
+            value={formik.values.content}
+            onChangeText={formik.handleChange("content")}
+            onBlur={formik.handleBlur("content")}
+          />
+          {formik.touched.content && formik.errors.content && (
+            <Text style={styles.errorText}>{formik.errors.content}</Text>
+          )}
+
+          <Text style={styles.label}>Topic *</Text>
+          <View style={styles.pickerWrapper}>
             <Picker
-              selectedValue={q.type}
-              style={styles.picker}
-              onValueChange={(value) => handleQuestionChange(index, "type", value)}
+              selectedValue={formik.values.topicId}
+              onValueChange={(value) => formik.setFieldValue("topicId", value)}
             >
-              <Picker.Item label="Single Choice" value="single-choice" />
-              <Picker.Item label="Multiple Choice" value="multiple-choice" />
-              <Picker.Item label="True/False" value="true-false" />
+              <Picker.Item label="-- Select Topic --" value="" />
+              {topics.map((topic) => (
+                <Picker.Item
+                  key={topic._id}
+                  label={topic.name}
+                  value={topic._id}
+                />
+              ))}
             </Picker>
-            {q.choices.map((choice, cIndex) => (
-              <View key={cIndex} style={styles.choiceRow}>
-                {q.type !== "true-false" ? (
-                  <TextInput
-                    placeholder={`Choice ${String.fromCharCode(65 + cIndex)}`}
-                    style={[styles.input, { flex: 1 }]}
-                    value={choice}
-                    onChangeText={(text) => handleChoiceChange(index, cIndex, text)}
-                  />
-                ) : (
-                  <Text style={{ flex: 1 }}>{choice}</Text>
-                )}
-                <TouchableOpacity
-                  style={[
-                    styles.correctBtn,
-                    q.correctAnswers.includes(cIndex) && styles.correctBtnActive,
-                  ]}
-                  onPress={() => handleCorrectAnswerChange(index, cIndex)}
-                >
-                  <Text
-                    style={{
-                      color: q.correctAnswers.includes(cIndex) ? "#fff" : "#374151",
-                    }}
-                  >
-                    ✓
+          </View>
+          {formik.touched.topicId && formik.errors.topicId && (
+            <Text style={styles.errorText}>{formik.errors.topicId}</Text>
+          )}
+
+          <Text style={styles.label}>Duration (minutes) *</Text>
+          <TextInput
+            keyboardType="numeric"
+            style={styles.input}
+            value={formik.values.duration}
+            onChangeText={formik.handleChange("duration")}
+          />
+
+          <Text style={styles.subHeader}>Questions</Text>
+          {questions.map((q, index) => (
+            <View key={index} style={styles.questionBlock}>
+              <View style={styles.questionHeader}>
+                <Text style={{ fontWeight: "600" }}>Question {index + 1}</Text>
+                <TouchableOpacity onPress={() => handleDeleteQuestion(index)}>
+                  <Text style={{ color: "#ef4444", fontWeight: "600" }}>
+                    Delete
                   </Text>
                 </TouchableOpacity>
               </View>
-            ))}
-          </View>
-        ))}
+              <TextInput
+                placeholder="Question Text"
+                style={styles.input}
+                value={q.questionText}
+                onChangeText={(text) =>
+                  handleQuestionChange(index, "questionText", text)
+                }
+              />
+              <View style={styles.pickerWrapper}>
+                <Picker
+                  selectedValue={q.type}
+                  onValueChange={(value) =>
+                    handleQuestionChange(index, "type", value)
+                  }
+                >
+                  <Picker.Item label="Single Choice" value="single-choice" />
+                  <Picker.Item
+                    label="Multiple Choice"
+                    value="multiple-choice"
+                  />
+                  <Picker.Item label="True/False" value="true-false" />
+                </Picker>
+              </View>
+              {q.choices.map((choice, cIndex) => (
+                <View key={cIndex} style={styles.choiceRow}>
+                  {q.type !== "true-false" ? (
+                    <TextInput
+                      placeholder={`Choice ${String.fromCharCode(65 + cIndex)}`}
+                      style={[styles.input, { flex: 1 }]}
+                      value={choice}
+                      onChangeText={(text) =>
+                        handleChoiceChange(index, cIndex, text)
+                      }
+                    />
+                  ) : (
+                    <Text style={{ flex: 1 }}>{choice}</Text>
+                  )}
+                  <TouchableOpacity
+                    style={[
+                      styles.correctBtn,
+                      q.correctAnswers.includes(cIndex) &&
+                        styles.correctBtnActive,
+                    ]}
+                    onPress={() => handleCorrectAnswerChange(index, cIndex)}
+                  >
+                    <Text
+                      style={{
+                        color: q.correctAnswers.includes(cIndex)
+                          ? "#fff"
+                          : "#374151",
+                      }}
+                    >
+                      ✓
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ))}
 
-        <TouchableOpacity style={styles.addQuestionBtn} onPress={handleAddQuestion}>
-          <Text style={styles.addQuestionText}>+ Add Question</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addQuestionBtn}
+            onPress={handleAddQuestion}
+          >
+            <Text style={styles.addQuestionText}>+ Add Question</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-          <Text style={styles.submitText}>Update Lesson</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <TouchableOpacity
+            style={styles.submitBtn}
+            onPress={formik.handleSubmit}
+          >
+            <Text style={styles.submitText}>Update Lesson</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#F0FDF4" },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
-    fontSize: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 16,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+    elevation: 2,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f1f5f9",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 20,
     fontWeight: "700",
     color: "#1e293b",
-    marginBottom: 16,
   },
-  subHeader: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#334155",
-    marginTop: 20,
-    marginBottom: 8,
+  subtitle: {
+    fontSize: 14,
+    color: "#64748b",
+    fontWeight: "500",
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 100,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#1e293b",
+    marginBottom: 6,
   },
   input: {
     backgroundColor: "#fff",
@@ -318,7 +423,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  textAreaLarge: { height: 180, textAlignVertical: "top" },
+  textArea: { height: 100, textAlignVertical: "top", height: 200 },
+  pickerWrapper: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 8,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  errorText: {
+    color: "#EF4444",
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  subHeader: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#334155",
+    marginTop: 20,
+    marginBottom: 8,
+  },
   questionBlock: {
     backgroundColor: "#fff",
     borderRadius: 8,
@@ -327,7 +452,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  picker: { marginBottom: 12 },
+  questionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
   choiceRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -339,7 +468,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "#e5e7eb",
   },
-  correctBtnActive: { backgroundColor: "#10b981" },
+  correctBtnActive: {
+    backgroundColor: "#10b981",
+  },
   addQuestionBtn: {
     backgroundColor: "#10b981",
     borderRadius: 8,
@@ -347,7 +478,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     alignItems: "center",
   },
-  addQuestionText: { color: "#fff", fontWeight: "600" },
+  addQuestionText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
   submitBtn: {
     backgroundColor: "#10b981",
     borderRadius: 8,
@@ -359,5 +493,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
     fontSize: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

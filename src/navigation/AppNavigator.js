@@ -22,6 +22,7 @@ import ViewAllLessonScreen from "../screens/ViewAllLessonScreen";
 import EditReadingLessonScreen from "../screens/EditReadingLessonScreen";
 import EditListeningLessonScreen from "../screens/EditListeningLessonScreen";
 import EditWritingLessonScreen from "../screens/EditWritingLessonScreen";
+import ManageTopicScreen from "../screens/ManageTopicScreen";
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
@@ -154,40 +155,77 @@ export default function AppNavigator() {
           }}
         />
         <Stack.Screen
-        name="CreateReadingLessonScreen"
-        component={CreateReadingLessonScreen}
-        options={{ title: "Tạo Bài Học" }}
-      />
+          name="CreateReadingLessonScreen"
+          component={CreateReadingLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
         <Stack.Screen
-        name="CreateWritingLessonScreen"
-        component={CreateWritingLessonScreen}
-        options={{ title: "Tạo Bài Học" }}
-      />
+          name="CreateWritingLessonScreen"
+          component={CreateWritingLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
         <Stack.Screen
-        name="CreateListeningLessonScreen"
-        component={CreateListeningLessonScreen}
-        options={{ title: "Tạo Bài Học" }}
-      />
+          name="CreateListeningLessonScreen"
+          component={CreateListeningLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
         <Stack.Screen
-        name="ViewAllLessonScreen"
-        component={ViewAllLessonScreen}
-        options={{ title: "Xem Bài Học" }}
-      />
+          name="ViewAllLessonScreen"
+          component={ViewAllLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
         <Stack.Screen
-        name="EditWritingLessonScreen"
-        component={EditWritingLessonScreen}
-        options={{ title: "Sửa Bài Học" }}
-      />
+          name="EditWritingLessonScreen"
+          component={EditWritingLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
         <Stack.Screen
-        name="EditReadingLessonScreen"
-        component={EditReadingLessonScreen}
-        options={{ title: "Sửa Bài Học" }}
-      />
+          name="EditReadingLessonScreen"
+          component={EditReadingLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
         <Stack.Screen
-        name="EditListeningLessonScreen"
-        component={EditListeningLessonScreen}
-        options={{ title: "Sửa Bài Học" }}
-      />
+          name="EditListeningLessonScreen"
+          component={EditListeningLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="ManageTopic"
+          component={ManageTopicScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

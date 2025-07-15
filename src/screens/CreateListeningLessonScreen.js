@@ -1,35 +1,172 @@
 "use client";
 
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
+  ScrollView,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-import * as DocumentPicker from "expo-document-picker";
-import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { Picker } from "@react-native-picker/picker";
+import * as DocumentPicker from "expo-document-picker";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+import api from "../services/api";
+import { BASE_URL } from "../constants/constants";
 export default function CreateListeningLessonScreen() {
   const navigation = useNavigation();
   const { params } = useRoute();
-  const { skill, skillName, level, adminName } = params || {};
+  const { level } = params;
 
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [topicName, setTopicName] = useState("");
-  const [topicDescription, setTopicDescription] = useState("");
+  const [topics, setTopics] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [audioFile, setAudioFile] = useState(null);
-  const [addingQuestion, setAddingQuestion] = useState(false);
-  const [newQuestionText, setNewQuestionText] = useState("");
-  const [newQuestionType, setNewQuestionType] = useState("single-choice");
-  const [newChoices, setNewChoices] = useState([""]);
-  const [correctAnswers, setCorrectAnswers] = useState([]);
+
+  useEffect(() => {
+    fetchTopics();
+  }, []);
+
+  const fetchTopics = async () => {
+    try {
+      const res = await api.get("/topic/all");
+      setTopics(Array.isArray(res.data.topics) ? res.data.topics : []);
+    } catch (err) {
+      console.error("Failed to fetch topics:", err);
+    }
+  };
+
+  const formik = useFormik({
+    initialValues: {
+      title: "",
+      content: "",
+      topicId: "",
+      duration: "10",
+    },
+    validationSchema: Yup.object().shape({
+      title: Yup.string().required("Required"),
+      content: Yup.string().required("Required"),
+      topicId: Yup.string().required("Please select a topic"),
+      duration: Yup.number().required("Required").min(1, "Minimum 1 minute"),
+    }),
+    onSubmit: async (values) => {
+      if (!audioFile) {
+        Alert.alert("Validation", "Please select an audio file.");
+        return;
+      }
+
+      const hasInvalid = questions.some(
+        (q) => !q.questionText.trim() || q.choices.some((c) => !c.trim())
+      );
+
+      if (hasInvalid) {
+        Alert.alert(
+          "Invalid Question",
+          "Each question must have text and all choices filled in."
+        );
+        return;
+      }
+
+      const selectedTopic = topics.find((t) => t._id === values.topicId);
+      if (!selectedTopic) {
+        Alert.alert("Error", "Selected topic not found.");
+        return;
+      }
+
+      const finalQuestions = questions.map((q) => ({
+        ...q,
+        skill: "listening",
+        level,
+      }));
+
+      const formData = new FormData();
+      formData.append("title", values.title);
+      formData.append("skill", "listening");
+      formData.append("level", level);
+      formData.append("content", values.content);
+      formData.append("duration", values.duration);
+      formData.append(
+        "topic",
+        JSON.stringify({
+          name: selectedTopic.name,
+          description: selectedTopic.description,
+        })
+      );
+      formData.append("questions", JSON.stringify(finalQuestions));
+      formData.append("media", {
+        uri: audioFile.uri,
+        name: audioFile.name,
+        type: audioFile.type,
+      });
+
+      try {
+        await fetch(`${BASE_URL}/api/lessons/full`, {
+          method: "POST",
+          headers: { "Content-Type": "multipart/form-data" },
+          body: formData,
+        });
+
+        Alert.alert("Success", "Lesson created successfully!", [
+          { text: "OK", onPress: () => navigation.goBack() },
+        ]);
+      } catch (err) {
+        console.error("Upload error:", err);
+        Alert.alert("Error", "Failed to create lesson.");
+      }
+    },
+  });
+
+  const handleAddQuestion = () => {
+    setQuestions((prev) => [
+      ...prev,
+      {
+        questionText: "",
+        choices: ["", "", "", ""],
+        correctAnswers: [0],
+        type: "single-choice",
+      },
+    ]);
+  };
+
+  const handleQuestionChange = (index, field, value) => {
+    const updated = [...questions];
+    updated[index][field] = value;
+    if (field === "type" && value === "true-false") {
+      updated[index].choices = ["True", "False"];
+      updated[index].correctAnswers = [0];
+    }
+    setQuestions(updated);
+  };
+
+  const handleChoiceChange = (qIndex, cIndex, value) => {
+    const updated = [...questions];
+    updated[qIndex].choices[cIndex] = value;
+    setQuestions(updated);
+  };
+
+  const handleCorrectAnswerChange = (qIndex, cIndex) => {
+    const updated = [...questions];
+    const question = updated[qIndex];
+    if (question.type === "single-choice" || question.type === "true-false") {
+      question.correctAnswers = [cIndex];
+    } else {
+      if (question.correctAnswers.includes(cIndex)) {
+        question.correctAnswers = question.correctAnswers.filter(
+          (i) => i !== cIndex
+        );
+      } else {
+        question.correctAnswers.push(cIndex);
+      }
+    }
+    setQuestions(updated);
+  };
 
   const handlePickFile = async () => {
     try {
@@ -45,8 +182,6 @@ export default function CreateListeningLessonScreen() {
           name: file.name,
           type: file.mimeType || "audio/mpeg",
         });
-      } else {
-        setAudioFile(null);
       }
     } catch (err) {
       console.error("File pick error:", err);
@@ -54,244 +189,223 @@ export default function CreateListeningLessonScreen() {
     }
   };
 
-  const handleAddQuestion = () => {
-    if (
-      !newQuestionText ||
-      newChoices.some((c) => !c) ||
-      correctAnswers.length === 0
-    ) {
-      Alert.alert(
-        "Validation",
-        "Please complete question, choices, and select correct answer(s)."
-      );
-      return;
-    }
-    const newQ = {
-      questionText: newQuestionText,
-      type: newQuestionType,
-      choices: [...newChoices],
-      level,
-      skill,
-      correctAnswers,
-    };
-    setQuestions([...questions, newQ]);
-    setNewQuestionText("");
-    setNewChoices([""]);
-    setCorrectAnswers([]);
-    setAddingQuestion(false);
-  };
-
-  const handleSubmit = async () => {
-    if (!title.trim() || !content.trim() || !audioFile?.uri) {
-      Alert.alert("Validation", "Please fill all required fields.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("skill", skill);
-    formData.append("level", level);
-    formData.append("content", content);
-    formData.append(
-      "topic",
-      JSON.stringify({ name: topicName, description: topicDescription })
-    );
-    formData.append("questions", JSON.stringify(questions));
-    formData.append("media", {
-      uri: audioFile.uri,
-      name: audioFile.name,
-      type: audioFile.type,
-    });
-
-    try {
-      const response = await fetch(
-        "http://192.168.1.65:9999/api/lessons/full",
-        {
-          method: "POST",
-          headers: { "Content-Type": "multipart/form-data" },
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Server error:", errorText);
-        throw new Error("Server error");
-      }
-
-      Alert.alert("Success", "Lesson created successfully.", [
-        { text: "OK", onPress: () => navigation.goBack() },
-      ]);
-    } catch (err) {
-      console.error("Upload error:", err);
-      Alert.alert("Error", "Failed to create lesson.");
-    }
-  };
-
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.header}>
-        Create {skillName} Lesson ({level})
-      </Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Title *"
-        value={title}
-        onChangeText={setTitle}
-      />
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="Content *"
-        value={content}
-        onChangeText={setContent}
-        multiline
-      />
-
-      <TouchableOpacity style={styles.fileBtn} onPress={handlePickFile}>
-        <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
-        <Text style={styles.fileBtnText}>
-          {audioFile ? audioFile.name : "Pick Audio File *"}
-        </Text>
-      </TouchableOpacity>
-
-      <Text style={styles.subHeader}>Topic</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Topic Name"
-        value={topicName}
-        onChangeText={setTopicName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Topic Description"
-        value={topicDescription}
-        onChangeText={setTopicDescription}
-      />
-
-      <Text style={styles.subHeader}>Questions</Text>
-      {questions.map((q, idx) => (
-        <View key={idx} style={styles.questionItem}>
-          <Text style={styles.questionText}>{q.questionText}</Text>
-          <Text style={styles.questionType}>{q.type}</Text>
-        </View>
-      ))}
-
-      {addingQuestion ? (
-        <View style={styles.newQuestionBlock}>
-          <TextInput
-            style={styles.input}
-            placeholder="Question Text *"
-            value={newQuestionText}
-            onChangeText={setNewQuestionText}
-          />
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F0FDF4" }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => {
-              setNewQuestionType(
-                newQuestionType === "single-choice"
-                  ? "multiple-choice"
-                  : "single-choice"
-              );
-              setCorrectAnswers([]);
-            }}
-            style={styles.toggleType}
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
           >
-            <Text style={styles.toggleTypeText}>
-              {newQuestionType === "single-choice"
-                ? "Switch to Multiple Choice"
-                : "Switch to Single Choice"}
+            <Ionicons name="arrow-back" size={24} color="#1e293b" />
+          </TouchableOpacity>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Create Listening Lesson</Text>
+            <Text style={styles.subtitle}>Level: {level}</Text>
+          </View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={{ padding: 20, paddingBottom: 80 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.label}>Topic *</Text>
+          <View style={styles.pickerWrapper}>
+            <Picker
+              selectedValue={formik.values.topicId}
+              onValueChange={(itemValue) =>
+                formik.setFieldValue("topicId", itemValue)
+              }
+            >
+              <Picker.Item label="-- Select Topic --" value="" />
+              {topics.map((topic) => (
+                <Picker.Item
+                  key={topic._id}
+                  label={topic.name}
+                  value={topic._id}
+                />
+              ))}
+            </Picker>
+          </View>
+          {formik.touched.topicId && formik.errors.topicId && (
+            <Text style={styles.errorText}>{formik.errors.topicId}</Text>
+          )}
+
+          <Text style={styles.label}>Title *</Text>
+          <TextInput
+            placeholder="Title *"
+            style={styles.input}
+            value={formik.values.title}
+            onChangeText={formik.handleChange("title")}
+            onBlur={formik.handleBlur("title")}
+          />
+          {formik.touched.title && formik.errors.title && (
+            <Text style={styles.errorText}>{formik.errors.title}</Text>
+          )}
+
+          <Text style={styles.label}>Content *</Text>
+          <TextInput
+            placeholder="Listening Content *"
+            style={[styles.input, { height: 100, textAlignVertical: "top" }]}
+            multiline
+            value={formik.values.content}
+            onChangeText={formik.handleChange("content")}
+            onBlur={formik.handleBlur("content")}
+          />
+          {formik.touched.content && formik.errors.content && (
+            <Text style={styles.errorText}>{formik.errors.content}</Text>
+          )}
+
+          <Text style={styles.label}>Duration (minutes) *</Text>
+          <TextInput
+            placeholder="Duration (minutes) *"
+            keyboardType="numeric"
+            style={styles.input}
+            value={formik.values.duration}
+            onChangeText={formik.handleChange("duration")}
+            onBlur={formik.handleBlur("duration")}
+          />
+          {formik.touched.duration && formik.errors.duration && (
+            <Text style={styles.errorText}>{formik.errors.duration}</Text>
+          )}
+
+          <TouchableOpacity style={styles.audioBtn} onPress={handlePickFile}>
+            <Text style={{ color: "#fff" }}>
+              {audioFile?.name || "Select Audio File *"}
             </Text>
           </TouchableOpacity>
-          {newChoices.map((choice, i) => (
-            <View
-              key={i}
-              style={{ flexDirection: "row", alignItems: "center" }}
-            >
+
+          <Text style={styles.subHeader}>Questions</Text>
+          {questions.map((q, index) => (
+            <View key={index} style={styles.questionBlock}>
               <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder={`Choice ${i + 1}`}
-                value={choice}
-                onChangeText={(txt) => {
-                  const updated = [...newChoices];
-                  updated[i] = txt;
-                  setNewChoices(updated);
-                }}
+                placeholder={`Question ${index + 1}`}
+                style={styles.input}
+                value={q.questionText}
+                onChangeText={(text) =>
+                  handleQuestionChange(index, "questionText", text)
+                }
               />
-              <TouchableOpacity
-                onPress={() => {
-                  if (newQuestionType === "single-choice") {
-                    setCorrectAnswers([i]);
-                  } else {
-                    if (correctAnswers.includes(i)) {
-                      setCorrectAnswers(correctAnswers.filter((idx) => idx !== i));
-                    } else {
-                      setCorrectAnswers([...correctAnswers, i]);
-                    }
+              <View style={styles.pickerWrapper}>
+                <Picker
+                  selectedValue={q.type}
+                  onValueChange={(value) =>
+                    handleQuestionChange(index, "type", value)
                   }
-                }}
-                style={{
-                  marginLeft: 8,
-                  padding: 6,
-                  borderRadius: 4,
-                  backgroundColor: correctAnswers.includes(i)
-                    ? "#10b981"
-                    : "#e5e7eb",
-                }}
-              >
-                <Text
-                  style={{
-                    color: correctAnswers.includes(i) ? "#fff" : "#374151",
-                  }}
                 >
-                  ✓
-                </Text>
-              </TouchableOpacity>
+                  <Picker.Item label="Single Choice" value="single-choice" />
+                  <Picker.Item
+                    label="Multiple Choice"
+                    value="multiple-choice"
+                  />
+                  <Picker.Item label="True/False" value="true-false" />
+                </Picker>
+              </View>
+              {q.choices.map((choice, cIndex) => (
+                <View key={cIndex} style={styles.choiceRow}>
+                  {q.type !== "true-false" ? (
+                    <TextInput
+                      placeholder={`Choice ${String.fromCharCode(65 + cIndex)}`}
+                      style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                      value={choice}
+                      onChangeText={(text) =>
+                        handleChoiceChange(index, cIndex, text)
+                      }
+                    />
+                  ) : (
+                    <Text style={{ flex: 1, fontSize: 16 }}>{choice}</Text>
+                  )}
+                  <TouchableOpacity
+                    style={[
+                      styles.correctBtn,
+                      q.correctAnswers.includes(cIndex) &&
+                        styles.correctBtnActive,
+                    ]}
+                    onPress={() => handleCorrectAnswerChange(index, cIndex)}
+                  >
+                    <Text
+                      style={{
+                        color: q.correctAnswers.includes(cIndex)
+                          ? "#fff"
+                          : "#374151",
+                      }}
+                    >
+                      ✓
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
           ))}
+
           <TouchableOpacity
-            style={styles.addChoiceBtn}
-            onPress={() => setNewChoices([...newChoices, ""])}
-          >
-            <Ionicons name="add-circle-outline" size={18} color="#10b981" />
-            <Text style={styles.addChoiceText}>Add Choice</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.saveQuestionBtn}
+            style={styles.addQuestionBtn}
             onPress={handleAddQuestion}
           >
-            <Text style={styles.saveQuestionText}>Save Question</Text>
+            <Text style={styles.addQuestionText}>+ Add Question</Text>
           </TouchableOpacity>
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={styles.addQuestionBtn}
-          onPress={() => setAddingQuestion(true)}
-        >
-          <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addQuestionText}>Add Question</Text>
-        </TouchableOpacity>
-      )}
 
-      <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-        <Text style={styles.submitText}>Create Lesson</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          <TouchableOpacity
+            style={styles.submitBtn}
+            onPress={formik.handleSubmit}
+          >
+            <Text style={styles.submitText}>Create Lesson</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, backgroundColor: "#F0FDF4" },
   header: {
-    fontSize: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 16,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 20,
     fontWeight: "700",
     color: "#1e293b",
-    marginBottom: 16,
+    marginBottom: 2,
   },
-  subHeader: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#334155",
-    marginTop: 20,
-    marginBottom: 8,
+  subtitle: {
+    fontSize: 14,
+    color: "#64748b",
+    fontWeight: "500",
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f1f5f9",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#1e293b",
+    marginBottom: 6,
+    marginTop: 12,
   },
   input: {
     backgroundColor: "#fff",
@@ -300,56 +414,73 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    fontSize: 16,
   },
-  textArea: {
-    height: 80,
-    textAlignVertical: "top",
+  pickerWrapper: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 8,
+    marginBottom: 12,
+    overflow: "hidden",
   },
-  fileBtn: {
-    flexDirection: "row",
-    alignItems: "center",
+  errorText: {
+    color: "#EF4444",
+    fontSize: 13,
+    marginBottom: 8,
+    marginLeft: 5,
+  },
+  subHeader: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#334155",
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  audioBtn: {
     backgroundColor: "#10b981",
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
+    alignItems: "center",
   },
-  fileBtnText: { color: "#fff", marginLeft: 8 },
-  questionItem: {
+  questionBlock: {
     backgroundColor: "#fff",
     borderRadius: 8,
     padding: 12,
-    marginBottom: 8,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  questionText: { fontSize: 16, fontWeight: "500", color: "#1e293b" },
-  questionType: { fontSize: 12, color: "#64748b" },
-  newQuestionBlock: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  toggleType: { marginBottom: 8 },
-  toggleTypeText: { color: "#10b981", fontWeight: "500" },
-  addChoiceBtn: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  addChoiceText: { color: "#10b981", marginLeft: 4 },
-  saveQuestionBtn: {
-    backgroundColor: "#10b981",
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 12,
-  },
-  saveQuestionText: { color: "#fff", textAlign: "center", fontWeight: "600" },
-  addQuestionBtn: {
+  choiceRow: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 8,
+  },
+  correctBtn: {
+    marginLeft: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#e5e7eb",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  correctBtnActive: {
+    backgroundColor: "#10b981",
+  },
+  addQuestionBtn: {
     backgroundColor: "#10b981",
     borderRadius: 8,
     padding: 12,
     marginTop: 12,
+    alignItems: "center",
   },
-  addQuestionText: { color: "#fff", marginLeft: 8 },
+  addQuestionText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
   submitBtn: {
     backgroundColor: "#10b981",
     borderRadius: 8,

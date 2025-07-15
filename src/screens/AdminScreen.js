@@ -24,7 +24,6 @@ const levels = [
 export default function AdminScreen({ navigation, route }) {
   const adminName = route.params?.userName || "Admin";
   const [selectedLevel, setSelectedLevel] = useState(null);
-
   const slideAnim = useRef(new Animated.Value(0)).current;
   const levelScales = useRef(levels.map(() => new Animated.Value(1))).current;
 
@@ -51,12 +50,10 @@ export default function AdminScreen({ navigation, route }) {
 
   const handleSkillSelect = (skill) => {
     if (!selectedLevel) {
-      Alert.alert("Chưa chọn Level", "Vui lòng chọn một level trước.");
+      Alert.alert("Level Not Selected", "Please select a level first.");
       return;
     }
-
     let screenName = "";
-
     switch (skill.id) {
       case "reading":
         screenName = "CreateReadingLessonScreen";
@@ -68,10 +65,9 @@ export default function AdminScreen({ navigation, route }) {
         screenName = "CreateWritingLessonScreen";
         break;
       default:
-        Alert.alert("Lỗi", "Kỹ năng chưa được hỗ trợ.");
+        Alert.alert("Error", "Skill not supported.");
         return;
     }
-
     navigation.navigate(screenName, {
       adminName,
       skill: skill.id,
@@ -103,8 +99,8 @@ export default function AdminScreen({ navigation, route }) {
           <View style={styles.logoContainer}>
             <Text style={styles.logoText}>📝</Text>
           </View>
-          <Text style={styles.welcomeText}>Chào mừng, {adminName}!</Text>
-          <Text style={styles.title}>Chọn Level và kỹ năng</Text>
+          <Text style={styles.welcomeText}>Welcome, {adminName}!</Text>
+          <Text style={styles.title}>Select Level and Skill</Text>
         </View>
 
         {/* Level Selector */}
@@ -153,6 +149,14 @@ export default function AdminScreen({ navigation, route }) {
           ))}
         </View>
 
+        {/* Topic Management Button */}
+        <TouchableOpacity
+          style={styles.topicManagementButton}
+          onPress={() => navigation.navigate("ManageTopic", { adminName })}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.topicManagementButtonText}>Manage Topics</Text>
+        </TouchableOpacity>
         {/* View All Lessons Button */}
         <TouchableOpacity
           style={styles.viewAllButton}
@@ -161,15 +165,15 @@ export default function AdminScreen({ navigation, route }) {
           }
           activeOpacity={0.85}
         >
-          <Text style={styles.viewAllButtonText}>Xem tất cả Lesson</Text>
+          <Text style={styles.viewAllButtonText}>View All Lessons</Text>
         </TouchableOpacity>
 
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            "Mỗi kỹ năng là một bước tiến tới sự thành thạo."
+            "Each skill is a step towards mastery."
           </Text>
-          <Text style={styles.footerAuthor}>- Đội ngũ Admin</Text>
+          <Text style={styles.footerAuthor}>- Admin Team</Text>
         </View>
       </Animated.View>
     </ScrollView>
@@ -203,7 +207,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 20,
   },
-
   // Level
   levelSelector: {
     flexDirection: "column",
@@ -235,7 +238,6 @@ const styles = StyleSheet.create({
   levelTextSelected: {
     color: "#FFF",
   },
-
   // Skills
   skillOptionsContainer: {
     flexDirection: "row",
@@ -260,7 +262,6 @@ const styles = StyleSheet.create({
   },
   skillIcon: { fontSize: 48, marginBottom: 10 },
   skillName: { fontSize: 18, fontWeight: "bold", color: "#111827" },
-
   viewAllButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -281,7 +282,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
   },
-
+  topicManagementButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#60A5FA", // A different color for distinction
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
+    marginBottom: 20,
+  },
+  topicManagementButtonText: {
+    color: "#FFF",
+    fontSize: 18,
+    fontWeight: "700",
+  },
   // Footer
   footer: { alignItems: "center", paddingVertical: 20 },
   footerText: {
