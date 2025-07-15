@@ -44,7 +44,7 @@ export default function LoginScreen({ navigation }) {
       });
 
       const { token } = res.data;
-      const decoded = jwtDecode(token); // dùng bình thường
+      const decoded = jwtDecode(token);
       const { role, name, userId } = decoded;
       console.log(`${role} - ${name} - ${userId}`);
       await SecureStore.setItemAsync("userToken", token);
