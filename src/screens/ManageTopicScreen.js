@@ -16,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import api from "../services/api";
-
+import { LogBox } from "react-native";
 const topicSchema = Yup.object().shape({
   name: Yup.string().trim().required("Topic name is required"),
   description: Yup.string().trim().required("Description is required"),
@@ -27,7 +27,11 @@ export default function ManageTopicScreen({ navigation, route }) {
   const [topics, setTopics] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [editingTopic, setEditingTopic] = useState(null);
-
+  useEffect(() => {
+    LogBox.ignoreLogs([
+      "VirtualizedLists should never be nested", // ẩn warning cụ thể này
+    ]);
+  }, []);
   useEffect(() => {
     fetchTopics();
   }, []);

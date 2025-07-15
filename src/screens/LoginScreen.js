@@ -52,7 +52,7 @@ export default function LoginScreen({ navigation }) {
       await SecureStore.setItemAsync("username", String(name));
       await SecureStore.setItemAsync("userRole", String(role));
       if (role === "admin") {
-        navigation.replace("AdminHome", { userName: name });
+        navigation.replace("Admin", { userName: name });
       } else {
         navigation.replace("Home", { userName: name });
       }

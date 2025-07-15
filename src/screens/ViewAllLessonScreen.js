@@ -14,6 +14,7 @@ import { useNavigation, useIsFocused } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../services/api";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LogBox } from "react-native";
 export default function AllLessonsScreen() {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
@@ -23,6 +24,11 @@ export default function AllLessonsScreen() {
 
   const [skillFilter, setSkillFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
+  useEffect(() => {
+    LogBox.ignoreLogs([
+      "VirtualizedLists should never be nested", // ẩn warning cụ thể này
+    ]);
+  }, []);
   useEffect(() => {
     if (isFocused) {
       fetchLessons();
@@ -40,11 +46,10 @@ export default function AllLessonsScreen() {
       if (levelFilter !== "all") query.push(`level=${levelFilter}`);
       const queryString = query.length > 0 ? "?" + query.join("&") : "";
 
-      const res = await api.get(`/lessons${queryString}`);
+      const res = await api.get(`/lessons/get_all${queryString}`);
       setLessons(res.data);
     } catch (err) {
       console.error("Fetch lessons failed", err);
-      Alert.alert("Error", "Failed to load lessons.");
     } finally {
       setLoading(false);
     }
