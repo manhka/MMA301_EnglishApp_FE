@@ -63,6 +63,7 @@ export default function ListeningScreen() {
       try {
         const res = await api.get(`/lesson/${lessonId}/listening`);
         const loadedLesson = res.data;
+        console.log(res.data.media);
         setLesson(loadedLesson);
         setTimeLeft(loadedLesson.duration * 60);
         const now = new Date();
@@ -134,7 +135,16 @@ export default function ListeningScreen() {
 
   const handlePlayAudio = async () => {
     try {
-      const audioUrl = `${BASE_URL}/uploads/audio1.mp3`;
+      if (!lesson?.media?.length) {
+        Alert.alert("Error", "No audio file provided for this lesson.");
+        return;
+      }
+
+      const audioFileName = lesson.media[0]; // Lấy file đầu tiên (nếu có nhiều file)
+      const audioUrl = `${BASE_URL}/uploads/${audioFileName}`;
+
+      console.log("🔊 Audio URL:", audioUrl); // debug log
+
       if (sound) {
         if (isPlaying) {
           await sound.pauseAsync();
@@ -145,12 +155,15 @@ export default function ListeningScreen() {
         }
         return;
       }
+
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
         { shouldPlay: true }
       );
+
       setSound(newSound);
       setIsPlaying(true);
+
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded) {
           setPlaybackPosition(status.positionMillis || 0);
