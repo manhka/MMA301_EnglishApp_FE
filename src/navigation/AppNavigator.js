@@ -5,7 +5,24 @@ import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import HomeScreen from "../screens/HomeScreen";
 import DashboardScreen from "../screens/DashboardScreen";
-
+import LessonScreen from "../screens/LessonScreen";
+import LessonDetailsScreen from "../screens/LessonDetailtsScreen";
+import ReadingScreen from "../screens/ReadingScreen";
+import ListeningScreen from "../screens/ListeningScreen";
+import WritingScreen from "../screens/WritingScreen";
+import SpeakingScreen from "../screens/SpeakingScreen";
+import ResultScreen from "../screens/ResultScreen";
+import Result2Screen from "../screens/Result2Screen";
+import HistoryScreen from "../screens/HistoryScreen";
+import AdminScreen from "../screens/AdminScreen";
+import CreateReadingLessonScreen from "../screens/CreateReadingLessonScreen";
+import CreateWritingLessonScreen from "../screens/CreateWritingLessonScreen";
+import CreateListeningLessonScreen from "../screens/CreateListeningLessonScreen";
+import ViewAllLessonScreen from "../screens/ViewAllLessonScreen";
+import EditReadingLessonScreen from "../screens/EditReadingLessonScreen";
+import EditListeningLessonScreen from "../screens/EditListeningLessonScreen";
+import EditWritingLessonScreen from "../screens/EditWritingLessonScreen";
+import ManageTopicScreen from "../screens/ManageTopicScreen";
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
@@ -18,6 +35,8 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
+            tabBarStyle: { display: "none" },
           }}
         />
         <Stack.Screen
@@ -26,6 +45,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -34,6 +54,7 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -42,6 +63,168 @@ export default function AppNavigator() {
           options={{
             headerShown: false,
             headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="Lesson"
+          component={LessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="LessonDetails"
+          component={LessonDetailsScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="Reading"
+          component={ReadingScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="Listening"
+          component={ListeningScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="Writing"
+          component={WritingScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="Speaking"
+          component={SpeakingScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="Result"
+          component={ResultScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="Result2"
+          component={Result2Screen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="History"
+          component={HistoryScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="Admin"
+          component={AdminScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+          }}
+        />
+        <Stack.Screen
+          name="CreateReadingLessonScreen"
+          component={CreateReadingLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="CreateWritingLessonScreen"
+          component={CreateWritingLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="CreateListeningLessonScreen"
+          component={CreateListeningLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="ViewAllLessonScreen"
+          component={ViewAllLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="EditWritingLessonScreen"
+          component={EditWritingLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="EditReadingLessonScreen"
+          component={EditReadingLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="EditListeningLessonScreen"
+          component={EditListeningLessonScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="ManageTopic"
+          component={ManageTopicScreen}
+          options={{
+            headerShown: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
           }}
         />
       </Stack.Navigator>

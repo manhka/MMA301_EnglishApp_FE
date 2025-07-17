@@ -10,11 +10,13 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-
+import * as NavigationBar from "expo-navigation-bar";
+import { useEffect } from "react";
 import { Formik } from "formik";
 import * as Yup from "yup";
 import api from "../services/api";
 import * as SecureStore from "expo-secure-store";
+import { jwtDecode } from "jwt-decode";
 // schema validation
 const LoginSchema = Yup.object().shape({
   email: Yup.string()
@@ -26,17 +28,34 @@ const LoginSchema = Yup.object().shape({
 });
 
 export default function LoginScreen({ navigation }) {
+  useEffect(() => {
+    const hideNavBar = async () => {
+      await NavigationBar.setVisibilityAsync("hidden");
+      await NavigationBar.setBehaviorAsync("immersive"); // hoặc 'inset-swipe' nếu bạn muốn vuốt để hiện lại
+    };
+
+    hideNavBar();
+  }, []);
   const handleLogin = async (values, { setSubmitting }) => {
     try {
       const res = await api.post("/auth/login", {
         email: values.email,
         password: values.password,
       });
-      console.log("token:", res.data.token);
-      // store token here (SecureStore) if you want
-      await SecureStore.setItemAsync("userToken", res.data.token);
-      const userName = res.data.user.name;
-      navigation.replace("Home", { userName });
+
+      const { token } = res.data;
+      const decoded = jwtDecode(token);
+      const { role, name, userId } = decoded;
+      console.log(`${role} - ${name} - ${userId}`);
+      await SecureStore.setItemAsync("userToken", token);
+      await SecureStore.setItemAsync("userId", String(userId));
+      await SecureStore.setItemAsync("username", String(name));
+      await SecureStore.setItemAsync("userRole", String(role));
+      if (role === "admin") {
+        navigation.replace("Admin", { userName: name });
+      } else {
+        navigation.replace("Home", { userName: name });
+      }
     } catch (err) {
       console.log(err);
       Alert.alert(
@@ -47,7 +66,6 @@ export default function LoginScreen({ navigation }) {
       setSubmitting(false);
     }
   };
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -131,17 +149,6 @@ export default function LoginScreen({ navigation }) {
                   {touched.password && errors.password && (
                     <Text style={styles.errorText}>{errors.password}</Text>
                   )}
-                </View>
-
-                {/* Options */}
-                <View style={styles.optionsContainer}>
-                  <TouchableOpacity style={styles.rememberContainer}>
-                    <View style={styles.checkbox} />
-                    <Text style={styles.rememberText}>Remember me</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity>
-                    <Text style={styles.forgotText}>Forgot password?</Text>
-                  </TouchableOpacity>
                 </View>
 
                 {/* Submit */}

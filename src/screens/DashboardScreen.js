@@ -1,392 +1,570 @@
-import React, { useState } from "react";
+"use client";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
   StyleSheet,
-  Dimensions,
+  ActivityIndicator,
   Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  SafeAreaView,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
+import api from "../services/api";
 
 const { width } = Dimensions.get("window");
 
-// Mock data
-const skillsData = [
-  { id: 1, name: "Listening", icon: "🎧", color: "#10B981", progress: 70 },
-  { id: 2, name: "Reading", icon: "📖", color: "#3B82F6", progress: 60 },
-  { id: 3, name: "Speaking", icon: "🗣️", color: "#F59E0B", progress: 40 },
-  { id: 4, name: "Writing", icon: "✍️", color: "#8B5CF6", progress: 30 },
-  { id: 5, name: "Vocabulary", icon: "📝", color: "#EF4444", progress: 50 },
-];
-
-const recommendedLessons = [
-  {
-    id: 1,
-    title: "Skimming Techniques",
-    skill: "Reading",
-    duration: "15 min",
-    level: "Intermediate",
-  },
-  {
-    id: 2,
-    title: "Opinion Essays",
-    skill: "Writing",
-    duration: "20 min",
-    level: "Beginner",
-  },
-  {
-    id: 3,
-    title: "Note-taking Strategies",
-    skill: "Listening",
-    duration: "12 min",
-    level: "Advanced",
-  },
-];
-
-const history = [
-  {
-    id: 1,
-    title: "Present Perfect Practice",
-    skill: "Grammar",
-    date: "2 days ago",
-    score: 85,
-  },
-  {
-    id: 2,
-    title: "Speaking Part 1 Topics",
-    skill: "Speaking",
-    date: "1 day ago",
-    score: 78,
-  },
-];
-
-// Mock my learning data
-const userStats = {
-  totalLessons: 42,
-  avgScores: { listening: 6.5, reading: 6, speaking: 6, writing: 5.5 },
-  totalTime: "12h 30m",
-  weakSkills: ["Writing", "Speaking"],
-};
-
 export default function DashboardScreen({ navigation, route }) {
-  const userName = route.params?.userName || "Student";
-  const [selectedTab, setSelectedTab] = useState("recommendations");
+  const [username, setUsername] = useState("Student");
+  useEffect(() => {
+    const fetchUsername = async () => {
+      try {
+        const username = await SecureStore.getItemAsync("username");
+        if (username) {
+          setUsername(username);
+        } else {
+          Alert.alert("Error", "User not found. Please login again.");
+          navigation.navigate("Login");
+        }
+      } catch (err) {
+        console.error("Failed to get userId", err);
+      }
+    };
+    fetchUsername();
+  }, []);
+
+  const userLevel = route.params?.level || "Beginner";
+  const [skills, setSkills] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showLearning, setShowLearning] = useState(false);
+  const [userStats, setUserStats] = useState(null);
 
-  const handleLogout = () => {
-    Alert.alert("Confirm Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          await SecureStore.deleteItemAsync("userToken");
-          await SecureStore.deleteItemAsync("userName");
+  useEffect(() => {
+    const fetchProgress = async () => {
+      try {
+        const userId = await SecureStore.getItemAsync("userId");
+        const level =
+          userLevel ||
+          (await SecureStore.getItemAsync("selectedLevel")) ||
+          "Beginner";
+        if (!userId) {
           navigation.replace("Login");
-        },
-      },
-    ]);
+          return;
+        }
+        const res = await api.get(`/${userId}/${level}/progress`);
+        const { progress } = res.data;
+        const skillsFormatted = [
+          {
+            id: 1,
+            name: "Listening",
+            icon: "🎧",
+            color: "#10B981",
+            progress: progress.skills.listening || 0,
+          },
+          {
+            id: 2,
+            name: "Reading",
+            icon: "📖",
+            color: "#059669",
+            progress: progress.skills.reading || 0,
+          },
+          {
+            id: 3,
+            name: "Speaking",
+            icon: "🗣️",
+            color: "#047857",
+            progress: progress.skills.speaking || 0,
+          },
+          {
+            id: 4,
+            name: "Writing",
+            icon: "✍️",
+            color: "#065f46",
+            progress: progress.skills.writing || 0,
+          },
+        ];
+        setSkills(skillsFormatted);
+        setLoading(false);
+      } catch (err) {
+        console.log("fetch progress error", err);
+        Alert.alert("Error", "Could not load progress");
+        setLoading(false);
+      }
+    };
+    fetchProgress();
+  }, [userLevel]);
+
+  const getLevelStyle = (level) => {
+    switch (level) {
+      case "Beginner":
+        return {
+          backgroundColor: "#dcfce7",
+          color: "#166534",
+          borderColor: "#86efac",
+        };
+      case "Intermediate":
+        return {
+          backgroundColor: "#fef3c7",
+          color: "#92400e",
+          borderColor: "#fbbf24",
+        };
+      case "Advanced":
+        return {
+          backgroundColor: "#fecaca",
+          color: "#991b1b",
+          borderColor: "#f87171",
+        };
+      default:
+        return {
+          backgroundColor: "#f3f4f6",
+          color: "#374151",
+          borderColor: "#d1d5db",
+        };
+    }
+  };
+
+  const handleBack = async () => {
+    try {
+      await SecureStore.setItemAsync("level", "Beginner");
+      navigation.navigate("Home");
+    } catch (error) {
+      console.error("Failed to store secure item:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.post("/auth/logout");
+      await SecureStore.deleteItemAsync("username");
+      await SecureStore.deleteItemAsync("userId");
+      await SecureStore.deleteItemAsync("userToken");
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Login" }],
+      });
+    } catch (err) {
+      console.error("Logout error:", err);
+      Alert.alert("Error", "Logout failed");
+    }
+  };
+
+  const handleViewHistory = () => {
+    navigation.navigate("History", {
+      userName: username,
+      level: userLevel,
+    });
   };
 
   const renderSkill = (skill) => (
     <TouchableOpacity
       key={skill.id}
       style={[styles.skillCard, { borderColor: skill.color }]}
-      onPress={() => navigation.navigate("LessonList", { skill: skill.name })}
+      onPress={() =>
+        navigation.navigate("Lesson", {
+          level: userLevel,
+          skill: skill.name.toLowerCase(),
+        })
+      }
+      activeOpacity={0.8}
     >
-      <Text style={styles.skillIcon}>{skill.icon}</Text>
-      <Text style={styles.skillTitle}>{skill.name}</Text>
-      <View style={styles.progressBar}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${skill.progress}%`, backgroundColor: skill.color },
-          ]}
-        />
+      <View style={styles.skillHeader}>
+        <Text style={styles.skillIcon}>{skill.icon}</Text>
       </View>
-      <Text style={styles.progressText}>{skill.progress}%</Text>
+      <Text style={styles.skillTitle}>{skill.name}</Text>
+      {/* Progress bar and label removed */}
     </TouchableOpacity>
   );
 
-  const renderRecommended = () =>
-    recommendedLessons.map((lesson) => (
-      <TouchableOpacity key={lesson.id} style={styles.lessonCard}>
-        <Text style={styles.lessonTitle}>{lesson.title}</Text>
-        <Text style={styles.lessonDetail}>
-          {lesson.skill} • {lesson.duration} • {lesson.level}
-        </Text>
-      </TouchableOpacity>
-    ));
-
-  const renderHistory = () =>
-    history.map((item) => (
-      <View key={item.id} style={styles.historyCard}>
-        <Text style={styles.historyTitle}>{item.title}</Text>
-        <Text style={styles.historyDetail}>
-          {item.skill} • {item.date}
-        </Text>
-        <Text style={styles.historyScore}>Score: {item.score}%</Text>
-      </View>
-    ));
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
+        <View style={styles.loadingContent}>
+          <ActivityIndicator size="large" color="#10b981" />
+          <Text style={styles.loadingText}>Loading your dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <>
-      <ScrollView style={styles.container}>
-        {/* Header */}
-        <View style={styles.headerContainer}>
-          <TouchableOpacity
-            style={styles.profileContainer}
-            onPress={() => setShowDropdown(!showDropdown)}
-          >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarIcon}>👤</Text>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          style={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Enhanced Header */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleBack}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={24} color="#1e293b" />
+            </TouchableOpacity>
+            <View style={styles.headerCenter}>
+              <Text style={styles.welcomeText}>Welcome back!</Text>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{username}</Text>
+                <View style={[styles.levelBadge, getLevelStyle(userLevel)]}>
+                  <Text
+                    style={[
+                      styles.levelBadgeText,
+                      { color: getLevelStyle(userLevel).color },
+                    ]}
+                  >
+                    {userLevel}
+                  </Text>
+                </View>
+              </View>
             </View>
-            <Text style={styles.profileName}>{userName}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Dropdown menu */}
-        {showDropdown && (
-          <View style={styles.dropdownMenu}>
             <TouchableOpacity
-              style={styles.dropdownItem}
-              onPress={() => {
-                setShowDropdown(false);
-                setShowLearning(true);
-              }}
+              style={styles.profileButton}
+              onPress={() => setShowDropdown(!showDropdown)}
+              activeOpacity={0.7}
             >
-              <Text style={styles.dropdownIcon}>📊</Text>
-              <Text style={styles.dropdownText}>My Learning</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.dropdownItem}
-              onPress={handleLogout}
-            >
-              <Text style={styles.dropdownIcon}>🔓</Text>
-              <Text style={styles.dropdownText}>Logout</Text>
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={20} color="#fff" />
+              </View>
             </TouchableOpacity>
           </View>
-        )}
 
-        {/* Skills */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Access</Text>
-          <View style={styles.skillsGrid}>{skillsData.map(renderSkill)}</View>
-        </View>
+          {/* Dropdown */}
+          {showDropdown && (
+            <View style={styles.dropdownMenu}>
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setShowDropdown(false);
+                  setShowLearning(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="analytics-outline" size={20} color="#64748b" />
+                <Text style={styles.dropdownText}>My Learning</Text>
+              </TouchableOpacity>
+              <View style={styles.dropdownDivider} />
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={handleLogout}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+                <Text style={[styles.dropdownText, { color: "#ef4444" }]}>
+                  Logout
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-        {/* Tabs */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              selectedTab === "recommendations" && styles.activeTab,
-            ]}
-            onPress={() => setSelectedTab("recommendations")}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                selectedTab === "recommendations" && styles.activeTabText,
-              ]}
-            >
-              Recommendations
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === "history" && styles.activeTab]}
-            onPress={() => setSelectedTab("history")}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                selectedTab === "history" && styles.activeTabText,
-              ]}
-            >
-              History
-            </Text>
-          </TouchableOpacity>
-        </View>
+          {/* Skills Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="library-outline" size={24} color="#10b981" />
+              <Text style={styles.sectionTitle}>Your Skills</Text>
+            </View>
+            <View style={styles.skillsGrid}>{skills.map(renderSkill)}</View>
+          </View>
 
-        {/* Dynamic section */}
-        <View style={styles.contentSection}>
-          {selectedTab === "recommendations"
-            ? renderRecommended()
-            : renderHistory()}
-        </View>
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
-
-      {/* MyLearning popup */}
-      {showLearning && (
-        <View style={styles.learningOverlay}>
-          <View style={styles.learningBox}>
-            <Text style={styles.learningTitle}>📊 My Learning</Text>
-            <Text style={styles.learningItem}>
-              Total lessons: {userStats.totalLessons}
-            </Text>
-            <Text style={styles.learningItem}>
-              Listening: {userStats.avgScores.listening}
-            </Text>
-            <Text style={styles.learningItem}>
-              Reading: {userStats.avgScores.reading}
-            </Text>
-            <Text style={styles.learningItem}>
-              Speaking: {userStats.avgScores.speaking}
-            </Text>
-            <Text style={styles.learningItem}>
-              Writing: {userStats.avgScores.writing}
-            </Text>
-            <Text style={styles.learningItem}>
-              Total time: {userStats.totalTime}
-            </Text>
-            <Text style={styles.learningItem}>
-              Weak skills: {userStats.weakSkills.join(", ")}
-            </Text>
+          {/* History Button Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="time-outline" size={24} color="#10b981" />
+              <Text style={styles.sectionTitle}>Learning History</Text>
+            </View>
             <TouchableOpacity
-              style={styles.learningClose}
-              onPress={() => setShowLearning(false)}
+              style={styles.historyButton}
+              onPress={handleViewHistory}
+              activeOpacity={0.8}
             >
-              <Text style={styles.learningCloseText}>Close</Text>
+              <View style={styles.historyButtonContent}>
+                <View style={styles.historyButtonLeft}>
+                  <View style={styles.historyIconContainer}>
+                    <Ionicons
+                      name="document-text-outline"
+                      size={24}
+                      color="#10b981"
+                    />
+                  </View>
+                  <View style={styles.historyTextContainer}>
+                    <Text style={styles.historyButtonTitle}>
+                      View Test History
+                    </Text>
+                    <Text style={styles.historyButtonSubtitle}>
+                      Track your progress and review past results
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#10b981" />
+              </View>
             </TouchableOpacity>
           </View>
-        </View>
-      )}
-    </>
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F0FDF4" },
-  headerContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    position: "relative",
-    zIndex: 99,
+  container: {
+    flex: 1,
+    backgroundColor: "#F0FDF4",
+    // marginTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
-  profileContainer: { flexDirection: "row", alignItems: "center" },
-  avatar: {
-    width: 40,
-    height: 40,
-    backgroundColor: "#059669",
-    borderRadius: 20,
+  scrollContainer: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: "#F0FDF4",
+  },
+  loadingContent: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#64748b",
+    marginTop: 12,
+    fontWeight: "500",
+  },
+  // Enhanced Header
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: Platform.OS === "ios" ? 20 : 20,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    backgroundColor: "#ffffff",
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f1f5f9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: "#64748b",
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  userInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1e293b",
     marginRight: 8,
   },
-  avatarIcon: { fontSize: 20, color: "#fff" },
-  profileName: { fontSize: 18, fontWeight: "bold", color: "#111827" },
+  levelBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  levelBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  profileButton: {
+    width: 40,
+    height: 40,
+  },
+  avatar: {
+    backgroundColor: "#10b981",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Dropdown
   dropdownMenu: {
     position: "absolute",
-    top: 100,
-    left: 20,
-    backgroundColor: "#FFF",
-    borderRadius: 8,
+    top: 120,
+    right: 20,
+    backgroundColor: "#fff",
+    borderRadius: 12,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 6,
-    width: 160,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    width: 180,
     zIndex: 999,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
   dropdownItem: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
-    borderBottomColor: "#F3F4F6",
-    borderBottomWidth: 1,
+    padding: 16,
   },
-  dropdownIcon: { fontSize: 18, marginRight: 8 },
-  dropdownText: { fontSize: 14, fontWeight: "500", color: "#111827" },
-  section: { paddingHorizontal: 20, marginBottom: 20 },
-  sectionTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 12 },
+  dropdownText: {
+    fontSize: 16,
+    color: "#374151",
+    marginLeft: 12,
+    fontWeight: "500",
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: "#e2e8f0",
+    marginHorizontal: 16,
+  },
+  // Sections
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+    marginTop: 24,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1e293b",
+    marginLeft: 8,
+  },
+  // Skills Grid
   skillsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 12,
   },
   skillCard: {
     width: (width - 64) / 2,
     backgroundColor: "#FFF",
+    borderWidth: 2,
     borderRadius: 16,
     padding: 16,
-    borderWidth: 2,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  skillHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  skillIcon: {
+    fontSize: 32,
+  },
+  skillBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  skillBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  skillTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1e293b",
     marginBottom: 12,
   },
-  skillIcon: { fontSize: 28, marginBottom: 8 },
-  skillTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 8 },
+  // These styles are no longer used but kept for completeness
+  progressContainer: {
+    marginTop: 8,
+  },
   progressBar: {
     height: 6,
     backgroundColor: "#E5E7EB",
     borderRadius: 3,
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  progressFill: { height: "100%", borderRadius: 3 },
-  progressText: { fontSize: 12, color: "#6B7280", fontWeight: "600" },
-  tabContainer: {
-    flexDirection: "row",
+  progressFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: "#64748b",
+    fontWeight: "500",
+  },
+  // History Button
+  historyButton: {
     backgroundColor: "#FFF",
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginBottom: 12,
-  },
-  tab: { flex: 1, alignItems: "center", paddingVertical: 12 },
-  activeTab: { backgroundColor: "#059669" },
-  tabText: { fontSize: 16, fontWeight: "600", color: "#6B7280" },
-  activeTabText: { color: "#FFF" },
-  contentSection: { paddingHorizontal: 20 },
-  lessonCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  lessonTitle: { fontSize: 16, fontWeight: "bold", color: "#111827" },
-  lessonDetail: { fontSize: 14, color: "#6B7280", marginTop: 4 },
-  historyCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  historyTitle: { fontSize: 16, fontWeight: "bold", color: "#111827" },
-  historyDetail: { fontSize: 14, color: "#6B7280", marginTop: 4 },
-  historyScore: {
-    fontSize: 14,
-    color: "#059669",
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  learningOverlay: {
-    position: "absolute",
-    top: 100,
-    left: 20,
-    right: 20,
-    backgroundColor: "#FFF",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
-    zIndex: 999,
-    elevation: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
     shadowColor: "#000",
-    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
     shadowRadius: 8,
+    elevation: 2,
   },
-  learningBox: {},
-  learningTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 12 },
-  learningItem: { fontSize: 14, marginVertical: 4 },
-  learningClose: {
-    marginTop: 12,
-    backgroundColor: "#059669",
-    padding: 10,
-    borderRadius: 8,
+  historyButtonContent: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
   },
-  learningCloseText: { color: "#fff", fontWeight: "600" },
+  historyButtonLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  historyIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#f0fdf4",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  historyTextContainer: {
+    flex: 1,
+  },
+  historyButtonTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1e293b",
+    marginBottom: 4,
+  },
+  historyButtonSubtitle: {
+    fontSize: 14,
+    color: "#64748b",
+    fontWeight: "500",
+  },
 });
