@@ -22,6 +22,8 @@ import * as DocumentPicker from "expo-document-picker";
 import { Audio } from "expo-av";
 import { BASE_URL } from "../constants/constants";
 import api from "../services/api";
+import * as SecureStore from "expo-secure-store";
+
 export default function EditListeningLessonScreen() {
   const formatAudioTime = (millis) => {
     const totalSeconds = Math.floor(millis / 1000);
@@ -42,6 +44,15 @@ export default function EditListeningLessonScreen() {
   const [level, setLevel] = useState("");
   const [topics, setTopics] = useState([]);
   const soundRef = useRef(null);
+  const getTokenFromSecureStore = async () => {
+    try {
+      const token = await SecureStore.getItemAsync("userToken");
+      return token;
+    } catch (error) {
+      console.error("Error retrieving token:", error);
+      return null;
+    }
+  };
   const handleSubmit = async (values) => {
     const selectedTopic = topics.find((t) => t._id === values.topicId);
     if (!selectedTopic) {
@@ -80,13 +91,7 @@ export default function EditListeningLessonScreen() {
     formData.append("skill", "listening");
     formData.append("level", level);
     formData.append("content", values.content);
-    formData.append(
-      "topic",
-      JSON.stringify({
-        name: selectedTopic.name,
-        description: selectedTopic.description,
-      })
-    );
+    formData.append("topicId", values.topicId);
     formData.append("duration", values.duration);
     formData.append("questions", JSON.stringify(finalQuestions));
 
@@ -99,8 +104,13 @@ export default function EditListeningLessonScreen() {
     }
 
     try {
+      const token = await getTokenFromSecureStore();
       const res = await fetch(`${BASE_URL}/api/lessons/${id}`, {
         method: "PUT",
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`,
+        },
         body: formData,
       });
 

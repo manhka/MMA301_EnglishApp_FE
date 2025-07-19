@@ -8,6 +8,10 @@ import {
   Animated,
   Alert,
 } from "react-native";
+import * as SecureStore from "expo-secure-store";
+
+import { Ionicons } from "@expo/vector-icons";
+import api from "../services/api";
 
 const ieltsSkills = [
   { id: "listening", name: "Listening", icon: "🎧" },
@@ -47,7 +51,21 @@ export default function AdminScreen({ navigation, route }) {
       }).start();
     });
   };
-
+  const handleLogout = async () => {
+    try {
+      await api.post("/auth/logout");
+      await SecureStore.deleteItemAsync("username");
+      await SecureStore.deleteItemAsync("userId");
+      await SecureStore.deleteItemAsync("userToken");
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Login" }],
+      });
+    } catch (err) {
+      console.error("Logout error:", err);
+      Alert.alert("Error", "Logout failed");
+    }
+  };
   const handleSkillSelect = (skill) => {
     if (!selectedLevel) {
       Alert.alert("Level Not Selected", "Please select a level first.");
@@ -101,6 +119,14 @@ export default function AdminScreen({ navigation, route }) {
           </View>
           <Text style={styles.welcomeText}>Welcome, {adminName}!</Text>
           <Text style={styles.title}>Select Level and Skill</Text>
+          {/* Logout Button */}
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="log-out" size={30} color="#DC2626" />
+          </TouchableOpacity>
         </View>
 
         {/* Level Selector */}
@@ -310,6 +336,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontStyle: "italic",
     marginBottom: 8,
+  },
+  logoutButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
   },
   footerAuthor: { fontSize: 14, color: "#9CA3AF", fontWeight: "500" },
 });

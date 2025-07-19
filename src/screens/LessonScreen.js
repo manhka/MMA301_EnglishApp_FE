@@ -189,6 +189,7 @@ const TopicCard = ({ topic, level, skill, navigation }) => {
       try {
         console.log(`${topic._id}- ${level} - ${skill}`);
         const res = await api.get(`/lessons/${topic._id}/${level}/${skill}`);
+        console.log(`==========>${res.data.total}`);
         setLessons(res.data.lessons || []);
       } catch (err) {
         console.error("Failed to fetch lessons", err);
@@ -218,9 +219,6 @@ const TopicCard = ({ topic, level, skill, navigation }) => {
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
-
-  const completedLessons = lessons.filter((lesson) => lesson.completed).length;
-  const totalLessons = lessons.length;
 
   return (
     <View style={styles.topicCard}>

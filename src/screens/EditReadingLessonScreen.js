@@ -81,10 +81,7 @@ export default function EditReadingLessonScreen() {
           level,
           content: values.content,
           duration: parseInt(values.duration),
-          topic: {
-            name: selectedTopic.name,
-            description: selectedTopic.description,
-          },
+          topicId: values.topicId,
           media: [],
           questions: finalQuestions,
         });

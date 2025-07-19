@@ -67,10 +67,7 @@ export default function CreateLessonWritingScreen() {
           skill: "writing",
           level,
           duration: parseInt(values.duration),
-          topic: {
-            name: topic.name,
-            description: topic.description,
-          },
+          topicId: values.topicId,
           media: [],
           questions: [], // No questions for writing
         });

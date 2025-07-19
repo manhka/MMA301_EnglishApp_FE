@@ -92,10 +92,7 @@ export default function CreateReadingLessonScreen() {
           level,
           content: values.content,
           duration: Number.parseInt(values.duration),
-          topic: {
-            name: selectedTopic.name,
-            description: selectedTopic.description,
-          },
+          topicId: values.topicId,
           media: [],
           questions: finalQuestions,
         });

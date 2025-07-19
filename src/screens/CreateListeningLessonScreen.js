@@ -21,6 +21,7 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import api from "../services/api";
 import { BASE_URL } from "../constants/constants";
+import * as SecureStore from "expo-secure-store";
 export default function CreateListeningLessonScreen() {
   const navigation = useNavigation();
   const { params } = useRoute();
@@ -42,7 +43,15 @@ export default function CreateListeningLessonScreen() {
       console.error("Failed to fetch topics:", err);
     }
   };
-
+  const getTokenFromSecureStore = async () => {
+    try {
+      const token = await SecureStore.getItemAsync("userToken");
+      return token;
+    } catch (error) {
+      console.error("Error retrieving token:", error);
+      return null;
+    }
+  };
   const formik = useFormik({
     initialValues: {
       title: "",
@@ -92,13 +101,7 @@ export default function CreateListeningLessonScreen() {
       formData.append("level", level);
       formData.append("content", values.content);
       formData.append("duration", values.duration);
-      formData.append(
-        "topic",
-        JSON.stringify({
-          name: selectedTopic.name,
-          description: selectedTopic.description,
-        })
-      );
+      formData.append("topicId", values.topicId);
       formData.append("questions", JSON.stringify(finalQuestions));
       formData.append("media", {
         uri: audioFile.uri,
@@ -107,9 +110,13 @@ export default function CreateListeningLessonScreen() {
       });
 
       try {
+        const token = await getTokenFromSecureStore();
         await fetch(`${BASE_URL}/api/lessons/full`, {
           method: "POST",
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`,
+          },
           body: formData,
         });
 

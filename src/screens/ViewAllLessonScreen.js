@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   },
   filterRow: {
     flexDirection: "row",
-    gap: 8,
+    marginRight: 8,
     marginBottom: 12,
   },
   pickerWrapper: {
@@ -265,10 +265,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#FFFFFF",
+    marginHorizontal: 12,
   },
   picker: {
     width: "100%",
     height: 50,
+    backgroundColor: "#FFF",
   },
   lessonItem: {
     backgroundColor: "#FFFFFF",
