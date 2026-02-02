@@ -44,7 +44,7 @@ export default function EditWritingLessonScreen() {
       setDescription(lesson.topicId?.description || "");
     } catch (err) {
       console.error("Fetch lesson failed", err);
-      Alert.alert("Lỗi", "Không thể tải dữ liệu bài học.");
+      Alert.alert("Error", "Failed to load lesson.");
       navigation.goBack();
     } finally {
       setLoading(false);

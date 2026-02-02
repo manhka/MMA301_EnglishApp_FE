@@ -83,7 +83,7 @@ export default function CreateReadingLessonScreen() {
 
   const handleSubmit = async () => {
     if (!title || !content || !topicName || !description) {
-      Alert.alert("Thiếu thông tin", "Vui lòng điền đầy đủ thông tin bài học");
+      Alert.alert("Please fill all required fields.");
       return;
     }
 
@@ -108,7 +108,7 @@ export default function CreateReadingLessonScreen() {
         questions: finalQuestions,
       });
 
-      Alert.alert("Thành công", "Bài học đã được tạo", [
+      Alert.alert("Lesson created successfully", [
         {
           text: "OK",
           onPress: () => navigation.goBack(),
@@ -116,7 +116,7 @@ export default function CreateReadingLessonScreen() {
       ]);
     } catch (err) {
       console.error("Create failed", err.response?.data || err.message);
-      Alert.alert("Lỗi", "Không thể tạo bài học");
+      Alert.alert("Error", "Failed to create lesson.");
     }
   };
 

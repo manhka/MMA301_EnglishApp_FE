@@ -43,7 +43,7 @@ export default function AllLessonsScreen() {
   };
 
   const confirmDelete = (id) => {
-    Alert.alert("Xác nhận", "Bạn chắc chắn muốn xóa bài học này?", [
+    Alert.alert("Confirm, ", [
       { text: "Hủy" },
       {
         text: "Xóa",
@@ -59,7 +59,7 @@ export default function AllLessonsScreen() {
       setLessons((prev) => prev.filter((item) => item._id !== id));
     } catch (err) {
       console.error("Delete failed", err);
-      Alert.alert("Lỗi", "Không thể xóa bài học");
+      Alert.alert("Error", "Failed to delete lesson.");
     }
   };
 
@@ -78,7 +78,7 @@ export default function AllLessonsScreen() {
         screenName = "EditWritingLessonScreen";
         break;
       default:
-        Alert.alert("Lỗi", "Kỹ năng không hợp lệ");
+        Alert.alert("Error", "Skill not supported.");
         return;
     }
 

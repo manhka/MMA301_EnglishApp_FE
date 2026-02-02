@@ -105,7 +105,7 @@ export default function CreateListeningLessonScreen() {
 
     try {
       const response = await fetch(
-        "http://192.168.1.65:9999/api/lessons/full",
+        "http://192.168.1.45:9999/api/lessons/full",
         {
           method: "POST",
           headers: { "Content-Type": "multipart/form-data" },

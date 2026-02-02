@@ -26,7 +26,7 @@ export default function CreateLessonWritingScreen() {
 
   const handleSubmit = async () => {
     if (!title || !content || !topicName || !description) {
-      Alert.alert("Thiếu thông tin", "Vui lòng điền đầy đủ thông tin.");
+      Alert.alert("Please fill all required fields.");
       return;
     }
 
@@ -45,7 +45,7 @@ export default function CreateLessonWritingScreen() {
         questions: [], // Writing không có câu hỏi
       });
 
-      Alert.alert("Thành công", "Lesson Writing đã được tạo.", [
+      Alert.alert("Success", "Lesson created successfully.", [
         {
           text: "OK",
           onPress: () => navigation.goBack(),
@@ -53,7 +53,7 @@ export default function CreateLessonWritingScreen() {
       ]);
     } catch (err) {
       console.error("Create failed", err.response?.data || err.message);
-      Alert.alert("Lỗi", "Không thể tạo lesson.");
+      Alert.alert("Error", "Failed to create lesson.");
     }
   };
 
